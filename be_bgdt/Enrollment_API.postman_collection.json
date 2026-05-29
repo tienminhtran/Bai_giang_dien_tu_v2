@@ -1,0 +1,233 @@
+{
+  "info": {
+    "name": "Enrollment API",
+    "_postman_id": "enrollment-api-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api", "type": "string" },
+    { "key": "token",   "value": "",                          "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Login (Admin) — lấy token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const json = pm.response.json();",
+              "if (json.token) {",
+              "  pm.collectionVariables.set('token', json.token);",
+              "  console.log('Token đã lưu:', json.token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"123456\",\n  \"client_id\": \"staff_portal\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "2. GET listEnrollments — không filter",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/enrollments?page=1&pageSize=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["enrollments"],
+          "query": [
+            { "key": "page",     "value": "1"  },
+            { "key": "pageSize", "value": "10" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. GET listEnrollments — tìm theo MSSV",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/enrollments?student_code=21010&page=1&pageSize=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["enrollments"],
+          "query": [
+            { "key": "student_code", "value": "21010" },
+            { "key": "page",         "value": "1"     },
+            { "key": "pageSize",     "value": "10"    }
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. GET listEnrollments — tìm theo môn học + học kỳ",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/enrollments?course_code=INT&academic_year=2023-2024&semester=1&page=1&pageSize=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["enrollments"],
+          "query": [
+            { "key": "course_code",   "value": "INT"       },
+            { "key": "academic_year", "value": "2023-2024" },
+            { "key": "semester",      "value": "1"         },
+            { "key": "page",          "value": "1"         },
+            { "key": "pageSize",      "value": "10"        }
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. POST bulk — Đăng ký mới (new) — 3 SV từ seed",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"course_code\": \"INT101\",\n  \"academic_year\": \"2023-2024\",\n  \"semester\": 1,\n  \"enrollment_type\": \"new\",\n  \"student_ids\": [\n    \"C0000000-0000-0000-0000-000000000001\",\n    \"C0000000-0000-0000-0000-000000000002\",\n    \"C0000000-0000-0000-0000-000000000003\"\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/enrollments/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["enrollments", "bulk"]
+        }
+      }
+    },
+    {
+      "name": "6. POST bulk — Học lại (retake) — 1 SV",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"course_code\": \"INT101\",\n  \"academic_year\": \"2023-2024\",\n  \"semester\": 2,\n  \"enrollment_type\": \"retake\",\n  \"student_ids\": [\n    \"C0000000-0000-0000-0000-000000000001\"\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/enrollments/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["enrollments", "bulk"]
+        }
+      }
+    },
+    {
+      "name": "7. POST bulk — Học cải thiện (improve) — test normalize academic_year",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"course_code\": \"INT101\",\n  \"academic_year\": \"2023 - 2024\",\n  \"semester\": 1,\n  \"enrollment_type\": \"improve\",\n  \"student_ids\": [\n    \"C0000000-0000-0000-0000-000000000002\"\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/enrollments/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["enrollments", "bulk"]
+        }
+      }
+    },
+    {
+      "name": "8. POST bulk — test lỗi một phần (SV đã ghi danh rồi vẫn gửi lại)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"course_code\": \"INT101\",\n  \"academic_year\": \"2023-2024\",\n  \"semester\": 1,\n  \"enrollment_type\": \"new\",\n  \"student_ids\": [\n    \"C0000000-0000-0000-0000-000000000001\",\n    \"C0000000-0000-0000-0000-000000000002\"\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/enrollments/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["enrollments", "bulk"]
+        }
+      }
+    },
+    {
+      "name": "9. POST bulk — lỗi 404: course_code không tồn tại",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"course_code\": \"KHONG_TON_TAI\",\n  \"academic_year\": \"2023-2024\",\n  \"semester\": 1,\n  \"enrollment_type\": \"new\",\n  \"student_ids\": [\n    \"C0000000-0000-0000-0000-000000000001\"\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/enrollments/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["enrollments", "bulk"]
+        }
+      }
+    },
+    {
+      "name": "10. POST bulk — lỗi 400: enrollment_type sai",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"course_code\": \"INT101\",\n  \"academic_year\": \"2023-2024\",\n  \"semester\": 1,\n  \"enrollment_type\": \"sai_loai\",\n  \"student_ids\": [\n    \"C0000000-0000-0000-0000-000000000001\"\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/enrollments/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["enrollments", "bulk"]
+        }
+      }
+    },
+    {
+      "name": "11. POST bulk — lỗi 401: không có token",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"course_code\": \"INT101\",\n  \"academic_year\": \"2023-2024\",\n  \"semester\": 1,\n  \"enrollment_type\": \"new\",\n  \"student_ids\": [\"C0000000-0000-0000-0000-000000000001\"]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/enrollments/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["enrollments", "bulk"]
+        }
+      }
+    }
+  ]
+}
