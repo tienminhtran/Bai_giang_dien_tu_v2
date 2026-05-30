@@ -1,11 +1,16 @@
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
-const { sequelize, User, Role, UserRole, Lecturer, Faculty, AcademicDegree } = require('../models');
+const { sequelize, User, Role, UserRole, Lecturer, Faculty, Major, AcademicDegree } = require('../models');
 
-const listLecturers = async ({ lecturer_code, full_name, page = 1, pageSize = 20 }) => {
+// faculty_id: lọc theo khoa; no_major: chỉ lấy GV chưa có chuyên ngành
+const listLecturers = async ({ lecturer_code, full_name, faculty_id, no_major, page = 1, pageSize = 20 }) => {
 	const where = {};
 	if (lecturer_code) where.lecturer_code = { [Op.like]: `%${lecturer_code}%` };
 	if (full_name) where.full_name = { [Op.like]: `%${full_name}%` };
+	if (faculty_id) where.faculty_id = faculty_id;
+	if (no_major === true || no_major === 'true' || no_major === '1') {
+		where.major_id = null;
+	}
 
 	const limit = Number(pageSize) || 20;
 	const offset = (Math.max(Number(page) || 1, 1) - 1) * limit;
@@ -17,14 +22,17 @@ const listLecturers = async ({ lecturer_code, full_name, page = 1, pageSize = 20
 			limit,
 			offset,
 			order: [['lecturer_code', 'ASC']],
-			include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+			include: [
+				{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] },
+				{ model: Major, as: 'major', attributes: ['id', 'major_name'] },
+			],
 		}),
 	]);
 
 	return { total, rows };
 };
 
-const createLecturer = async ({ lecturer_code, full_name, email, faculty_id, academic_degree, phone, avatar_url }) => {
+const createLecturer = async ({ lecturer_code, full_name, email, faculty_id, major_id, academic_degree, phone }) => {
 	if (!lecturer_code || !full_name) {
 		const err = new Error('lecturer_code và full_name là bắt buộc');
 		err.statusCode = 400;
@@ -68,9 +76,9 @@ const createLecturer = async ({ lecturer_code, full_name, email, faculty_id, aca
 			full_name: String(full_name).trim(),
 			email: email ? String(email).trim() : null,
 			faculty_id: faculty_id || null,
+			major_id: major_id || null,
 			academic_degree: academic_degree ? String(academic_degree).trim() : null,
 			phone: phone ? String(phone).trim() : null,
-			avatar_url: avatar_url ? String(avatar_url).trim() : null,
 			is_active: true,
 		}, { transaction: t });
 
@@ -250,11 +258,11 @@ const updateLecturer = async (lecturerId, payload) => {
 		if (payload.full_name !== undefined) updates.full_name = String(payload.full_name).trim();
 		if (payload.email !== undefined) updates.email = payload.email ? String(payload.email).trim() : null;
 		if (payload.faculty_id !== undefined) updates.faculty_id = payload.faculty_id || null;
+		if (payload.major_id !== undefined) updates.major_id = payload.major_id || null;
 		if (payload.academic_degree !== undefined) {
 			updates.academic_degree = payload.academic_degree ? String(payload.academic_degree).trim() : null;
 		}
 		if (payload.phone !== undefined) updates.phone = payload.phone ? String(payload.phone).trim() : null;
-		if (payload.avatar_url !== undefined) updates.avatar_url = payload.avatar_url ? String(payload.avatar_url).trim() : null;
 		if (payload.is_active !== undefined) updates.is_active = Boolean(payload.is_active);
 
 		if (Object.keys(updates).length > 0) {
@@ -262,7 +270,10 @@ const updateLecturer = async (lecturerId, payload) => {
 		}
 
 		const updated = await Lecturer.findByPk(lecturerId, {
-			include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+			include: [
+				{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] },
+				{ model: Major, as: 'major', attributes: ['id', 'major_name'] },
+			],
 			transaction: t,
 		});
 		return updated;
@@ -280,9 +291,14 @@ const updateLecturerDegree = async (lecturerId, academic_degree) => {
 	const degree = academic_degree ? String(academic_degree).trim() : null;
 	await Lecturer.update({ academic_degree: degree }, { where: { id: lecturerId } });
 	return Lecturer.findByPk(lecturerId, {
-		include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+		include: [
+			{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] },
+			{ model: Major, as: 'major', attributes: ['id', 'major_name'] },
+		],
 	});
 };
+
+
 
 module.exports = {
 	listLecturers,

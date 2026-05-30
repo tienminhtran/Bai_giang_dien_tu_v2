@@ -128,7 +128,7 @@ export default function LecturerRoleManagement() {
 
 	return (
 		<div className="space-y-6">
-			{/* ── Card 1: Filter + Action bar ── */}
+			{/*  Card 1: Filter + Action bar  */}
 			<Card className="border-slate-200 shadow-sm">
 				<CardHeader className="space-y-2">
 					<CardTitle className="text-2xl font-black text-[#08387F]">Phân quyền người dùng</CardTitle>
@@ -178,7 +178,7 @@ export default function LecturerRoleManagement() {
 				</CardContent>
 			</Card>
 
-			{/* ── Card 2: Table + Pagination ── */}
+			{/*  Card 2: Table + Pagination  */}
 			<Card className="border-slate-200 shadow-sm">
 				<CardHeader className="pb-3">
 					<CardTitle className="text-lg font-bold text-slate-900">Danh sách phân quyền</CardTitle>
@@ -294,7 +294,7 @@ export default function LecturerRoleManagement() {
 				</CardContent>
 			</Card>
 
-			{/* ── Dialog cập nhật quyền ── */}
+			{/*  Dialog cập nhật quyền  */}
 			<Dialog open={editOpen} onOpenChange={setEditOpen}>
 				<DialogContent className="sm:max-w-lg">
 					<DialogHeader>

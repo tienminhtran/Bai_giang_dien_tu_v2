@@ -103,6 +103,7 @@ export default function DepartmentHeadLecturerManagement() {
                   <TableHead className="whitespace-nowrap">Mã GV</TableHead>
                   <TableHead className="whitespace-nowrap">Họ tên</TableHead>
                   <TableHead className="whitespace-nowrap">Học vị</TableHead>
+                  <TableHead className="whitespace-nowrap">Chuyên ngành</TableHead>
                   <TableHead className="whitespace-nowrap">Email</TableHead>
                   <TableHead className="whitespace-nowrap">Số điện thoại</TableHead>
                   <TableHead className="whitespace-nowrap">Trạng thái</TableHead>
@@ -110,21 +111,22 @@ export default function DepartmentHeadLecturerManagement() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
                 ) : rows.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-slate-500">Không có giảng viên nào trong khoa.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-slate-500">Không có giảng viên nào trong khoa.</TableCell></TableRow>
                 ) : rows.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="whitespace-nowrap font-semibold text-slate-900">{r.lecturerCode}</TableCell>
                     <TableCell className="whitespace-nowrap">{r.fullName}</TableCell>
                     <TableCell className="whitespace-nowrap">{r.academicDegree || '—'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{r.majorName || '—'}</TableCell>
                     <TableCell>{r.email || '—'}</TableCell>
                     <TableCell className="whitespace-nowrap">{r.phone || '—'}</TableCell>
                     <TableCell>
                       <Badge className={r.isActive
                         ? 'rounded-none bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
                         : 'rounded-none bg-rose-100 text-rose-700 hover:bg-rose-100'}>
-                        {r.isActive ? 'Đang hoạt động' : 'Đã khóa'}
+                        {r.isActive ? 'Hoạt động' : 'Đã khóa'}
                       </Badge>
                     </TableCell>
                   </TableRow>

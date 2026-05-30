@@ -9,16 +9,20 @@ const toFrontend = (lecture) => ({
   email: lecture.email || '',
   facultyId: lecture.faculty_id || null,
   facultyName: lecture.faculty?.faculty_name || '',
+  majorId: lecture.major_id || null,
+  majorName: lecture.major?.major_name || '',
   academicDegree: lecture.academic_degree || '',
   phone: lecture.phone || '',
-  avatarUrl: lecture.avatar_url || '',
   isActive: Boolean(lecture.is_active),
 })
 
-const list = async ({ lecturerCode = '', fullName = '', page = 1, pageSize = 10 } = {}) => {
+// facultyId: lọc theo khoa; noMajor: chỉ lấy GV chưa có chuyên ngành
+const list = async ({ lecturerCode = '', fullName = '', facultyId = '', noMajor = false, page = 1, pageSize = 10 } = {}) => {
   const params = { page, pageSize }
   if (lecturerCode) params.lecturer_code = lecturerCode
   if (fullName) params.full_name = fullName
+  if (facultyId) params.faculty_id = facultyId
+  if (noMajor) params.no_major = true
 
   const res = await api.get(LECTURE_EP.LIST, { params })
   const { data, total } = res.data
@@ -31,9 +35,9 @@ const create = async (form) => {
     full_name: form.fullName?.trim(),
     email: form.email?.trim() || undefined,
     faculty_id: form.facultyId || undefined,
+    major_id: form.majorId || undefined,
     academic_degree: form.academicDegree || undefined,
     phone: form.phone?.trim() || undefined,
-    avatar_url: form.avatarUrl?.trim() || undefined,
   }
   const res = await api.post(LECTURE_EP.CREATE, body)
   return res.data
@@ -47,7 +51,6 @@ const importLecturers = async (lecturers) => {
     faculty_name:    form.facultyName?.trim() || undefined,
     academic_degree: form.academicDegree?.trim() || undefined,
     phone:           form.phone?.trim() || undefined,
-    avatar_url:      form.avatarUrl?.trim() || undefined,
   }))
   const res = await api.post(LECTURE_EP.IMPORT, body)
   return res.data.data
@@ -59,9 +62,9 @@ const update = async (id, form) => {
     full_name: form.fullName?.trim(),
     email: form.email?.trim() || undefined,
     faculty_id: form.facultyId || null,
+    major_id: form.majorId || null,
     academic_degree: form.academicDegree || null,
     phone: form.phone?.trim() || undefined,
-    avatar_url: form.avatarUrl?.trim() || undefined,
     is_active: form.isActive,
   }
   const res = await api.put(`${LECTURE_EP.UPDATE}/${id}`, body)

@@ -4,7 +4,7 @@ import {
   ClipboardList, ListChecks, FileText,
   BookOpen, Lock, FilePlus,
   GraduationCap, ClipboardCheck,
-  Calendar,
+  Calendar, BookMarked,
 } from 'lucide-react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import DashboardLayout from '../components/layout/DashboardLayout'
@@ -24,6 +24,9 @@ import FacultyManagement          from './Admin/FacultyManagement'
 import AcademicPositionManagement    from './Admin/AcademicPositionManagement'
 import DepartmentHeadDashboardPage       from './DepartmentHead/Dashboard'
 import DepartmentHeadLecturerManagement from './DepartmentHead/LecturerManagement'
+import DepartmentHeadMajorManagement    from './DepartmentHead/MajorManagement'
+import MajorManagementDetail            from './DepartmentHead/MajorManagementDetail'
+import AdminMajorManagement             from './Admin/MajorManagement'
 import MajorHeadDashboardPage        from './MajorHead/Dashboard'
 
 // ── Cấu hình menu theo role ─────────────────────────────────────────────────
@@ -53,7 +56,6 @@ const MENU_CONFIG = {
       {
         title: 'Môn học',
         items: [
-          { label: 'Quản lý học kỳ', icon: Calendar, path: '/dashboard/admin/semesters' },
           { label: 'Quản lý môn học',  icon: BookOpen, path: '/dashboard/admin/courses' },
           { label: 'Đăng ký học phần',  icon: FilePlus, path: '/dashboard/admin/enrollments' },
         ],
@@ -70,6 +72,7 @@ const MENU_CONFIG = {
         items: [
           { label: 'Quản lý học kỳ', icon: Calendar, path: '/dashboard/admin/semesters' },
           { label: 'Quản lý Khoa/Viện',  icon: GraduationCap, path: '/dashboard/admin/faculties' },
+          { label: 'Quản lý chuyên ngành', icon: BookMarked, path: '/dashboard/admin/majors' },
           { label: 'Quản lý Học vị', icon: UserCog, path: '/dashboard/admin/academic-positions' },
         ],
       }
@@ -126,9 +129,10 @@ const MENU_CONFIG = {
     groups: [
       {
         items: [
-          { label: 'Tổng quan',            icon: LayoutDashboard, path: '/dashboard/department-head' },
-          { label: 'Quản lý Giảng viên Khoa', icon: Users,       path: '/dashboard/department-head/lecturers' },
-          { label: 'Môn học',               icon: BookOpen,      path: '/dashboard/department-head/courses' },
+          { label: 'Tổng quan',              icon: LayoutDashboard, path: '/dashboard/department-head' },
+          { label: 'Quản lý Giảng viên Khoa', icon: Users,         path: '/dashboard/department-head/lecturers' },
+          { label: 'Quản lý chuyên ngành',    icon: BookMarked,    path: '/dashboard/department-head/majors' },
+          { label: 'Môn học',                 icon: BookOpen,      path: '/dashboard/department-head/courses' },
         ],
       },
     ],
@@ -197,6 +201,7 @@ export default function Dashboard() {
             <Route path="semesters"         element={<SemesterManagement />} />
             <Route path="enrollments"       element={<EnrollmentManagement />} />
             <Route path="faculties"         element={<FacultyManagement />} />
+            <Route path="majors"            element={<AdminMajorManagement />} />
             <Route path="academic-positions" element={<AcademicPositionManagement />} />
             <Route path="*" element={<Navigate to="/dashboard/admin" replace />} />
           </>
@@ -220,7 +225,9 @@ export default function Dashboard() {
         {activeRole === ROLES.DEPARTMENT_HEAD && (
           <>
             <Route index element={<DepartmentHeadDashboardPage />} />
-            <Route path="lecturers" element={<DepartmentHeadLecturerManagement />} />
+            <Route path="lecturers"              element={<DepartmentHeadLecturerManagement />} />
+            <Route path="majors"                 element={<DepartmentHeadMajorManagement />} />
+            <Route path="majors/:majorId"        element={<MajorManagementDetail />} />
             <Route path="courses"   element={<div className="py-10 text-center text-slate-500">Môn học — đang phát triển</div>} />
             <Route path="*" element={<Navigate to="/dashboard/department-head" replace />} />
           </>

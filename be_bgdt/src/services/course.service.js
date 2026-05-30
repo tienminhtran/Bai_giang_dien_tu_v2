@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
-const { sequelize, Course } = require('../models');
+const { sequelize, Course, Faculty } = require('../models');
 const ApiError = require('../utils/ApiError');
+const { checkSingleFaculty } = require('../helpers/courseHelpers');
 
 const listCourses = async ({ course_code, course_name, page = 1, pageSize = 20 }) => {
     const where = {};
@@ -11,7 +12,11 @@ const listCourses = async ({ course_code, course_name, page = 1, pageSize = 20 }
     const offset = (Math.max(Number(page) || 1, 1) - 1) * limit;
     const [total, rows] = await Promise.all([
         Course.count({ where }),
-        Course.findAll({ where, limit, offset, order: [['created_at', 'DESC']] }),
+        Course.findAll({
+            where, limit, offset,
+            order: [['created_at', 'DESC']],
+            include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+        }),
     ]);
     return { total, rows };
 };
@@ -21,6 +26,7 @@ const normalizeCoursePayload = (payload = {}) => ({
     course_name:  payload.course_name  == null ? '' : String(payload.course_name).trim(),
     credits:      payload.credits == null || payload.credits === '' ? null : Number(payload.credits),
     description:  payload.description  == null || payload.description === '' ? null : String(payload.description).trim(),
+    faculty_id:   payload.faculty_id == null || payload.faculty_id === '' ? null : String(payload.faculty_id).trim(),
     is_active:    payload.is_active === undefined ? true : Boolean(payload.is_active),
 });
 
@@ -34,13 +40,17 @@ const createCourse = async (payload = {}) => {
         throw ApiError.badRequest('credits không hợp lệ');
 
     const existed = await Course.findOne({ where: { course_code: data.course_code } });
-    if (existed) throw ApiError.conflict('Mã môn học đã tồn tại');
+    if (existed) {
+        checkSingleFaculty(existed, data.faculty_id);
+        throw ApiError.conflict('Mã môn học đã tồn tại');
+    }
 
     return Course.create({
         course_code:  data.course_code,
         course_name:  data.course_name,
         credits:      data.credits,
         description:  data.description,
+        faculty_id:   data.faculty_id,
         is_active:    data.is_active,
     });
 };
@@ -67,14 +77,17 @@ const importCourses = async (records) => {
                 throw ApiError.conflict('Mã môn học bị trùng trong file import', 'DUPLICATE_IN_FILE');
 
             const existed = await Course.findOne({ where: { course_code: normalized.course_code } });
-            if (existed)
+            if (existed) {
+                checkSingleFaculty(existed, normalized.faculty_id);
                 throw ApiError.conflict('Mã môn học đã tồn tại', 'DUPLICATE_IN_DATABASE');
+            }
 
             await Course.create({
                 course_code:  normalized.course_code,
                 course_name:  normalized.course_name,
                 credits:      normalized.credits,
                 description:  normalized.description,
+                faculty_id:   normalized.faculty_id,
                 is_active:    normalized.is_active,
             });
 
@@ -90,7 +103,50 @@ const importCourses = async (records) => {
         }
     }
 
-    return { successCount, errorCount: errors.length, errors };
+    return { total: records.length, successCount, errorCount: errors.length, errors };
 };
 
-module.exports = { listCourses, createCourse, importCourses };
+const updateCourse = async (id, payload = {}) => {
+    const course = await Course.findByPk(id);
+    if (!course) throw ApiError.notFound('Không tìm thấy môn học');
+
+    const data = normalizeCoursePayload({ ...course.toJSON(), ...payload });
+
+    if (!data.course_code || !data.course_name)
+        throw ApiError.badRequest('course_code và course_name là bắt buộc');
+
+    if (data.credits !== null && Number.isNaN(data.credits))
+        throw ApiError.badRequest('credits không hợp lệ');
+
+    // kiểm tra trùng mã nếu đổi course_code
+    if (data.course_code !== course.course_code) {
+        const dup = await Course.findOne({ where: { course_code: data.course_code } });
+        if (dup) throw ApiError.conflict('Mã môn học đã tồn tại');
+    }
+
+    // kiểm tra 1 môn học chỉ thuộc 1 khoa
+    if (data.faculty_id && course.faculty_id && String(data.faculty_id) !== String(course.faculty_id)) {
+        checkSingleFaculty(course, data.faculty_id);
+    }
+
+    await course.update({
+        course_code: data.course_code,
+        course_name: data.course_name,
+        credits:     data.credits,
+        description: data.description,
+        faculty_id:  data.faculty_id,
+        is_active:   data.is_active,
+    });
+
+    return Course.findByPk(id, {
+        include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+    });
+};
+
+const deleteCourse = async (id) => {
+    const course = await Course.findByPk(id);
+    if (!course) throw ApiError.notFound('Không tìm thấy môn học');
+    await course.destroy();
+};
+
+module.exports = { listCourses, createCourse, updateCourse, deleteCourse, importCourses };

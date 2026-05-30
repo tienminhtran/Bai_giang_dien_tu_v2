@@ -5,6 +5,7 @@ const User                   = require('./User')(sequelize);
 const Role                   = require('./Role')(sequelize);
 const UserRole               = require('./UserRole')(sequelize);
 const Faculty                = require('./Faculty')(sequelize);
+const Major                  = require('./Major')(sequelize);
 const AcademicDegree         = require('./AcademicDegree')(sequelize);
 const Lecturer               = require('./Lecturer')(sequelize);
 const Student                = require('./Student')(sequelize);
@@ -35,9 +36,18 @@ Role.belongsToMany(User, { through: UserRole, foreignKey: 'role_id', otherKey: '
 User.hasOne(Lecturer, { foreignKey: 'user_id' });
 Lecturer.belongsTo(User, { foreignKey: 'user_id' });
 
-// ── Nhóm 2: Khoa ─────────────────────────────────────────────────────────────
+// ── Nhóm 2: Khoa & Chuyên ngành ──────────────────────────────────────────────
+Faculty.hasMany(Major, { foreignKey: 'faculty_id', as: 'majors' });
+Major.belongsTo(Faculty, { foreignKey: 'faculty_id', as: 'faculty' });
+
 Faculty.hasMany(Lecturer, { foreignKey: 'faculty_id', as: 'lecturers' });
 Lecturer.belongsTo(Faculty, { foreignKey: 'faculty_id', as: 'faculty' });
+
+Faculty.hasMany(Course, { foreignKey: 'faculty_id', as: 'courses' });
+Course.belongsTo(Faculty, { foreignKey: 'faculty_id', as: 'faculty' });
+
+Major.hasMany(Lecturer, { foreignKey: 'major_id', as: 'lecturers' });
+Lecturer.belongsTo(Major, { foreignKey: 'major_id', as: 'major' });
 
 User.hasOne(Student, { foreignKey: 'user_id' });
 Student.belongsTo(User, { foreignKey: 'user_id' });
@@ -163,6 +173,7 @@ module.exports = {
   Role,
   UserRole,
   Faculty,
+  Major,
   AcademicDegree,
   Lecturer,
   Student,

@@ -24,6 +24,15 @@ module.exports = (sequelize) => {
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    count_manager: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
+    faculty_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     is_active: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

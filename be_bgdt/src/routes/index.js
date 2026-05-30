@@ -13,6 +13,7 @@ router.use('/students', require('./student.routes'));
 router.use('/courses', require('./course.routes'));
 router.use('/course-roles', require('./courseroles.routes'));
 router.use('/faculties',       require('./faculty.routes'));
+router.use('/majors',          require('./major.routes'));
 router.use('/academic-degrees', require('./academicDegree.routes'));
 router.use('/lectures',   require('./lecture.routes'));
 router.use('/user-roles',  require('./userrole.routes'));

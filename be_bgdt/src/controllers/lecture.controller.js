@@ -2,11 +2,11 @@ const lectureService = require('../services/lecture.service');
 
 const list = async (req, res) => {
   try {
-    const { lecturer_code, full_name, page = 1, pageSize = 20 } = req.query;
+    const { lecturer_code, full_name, faculty_id, no_major, page = 1, pageSize = 20 } = req.query;
     const pageNum = Math.max(Number(page) || 1, 1);
     const size = Math.max(Number(pageSize) || 20, 1);
 
-    const { total, rows } = await lectureService.listLecturers({ lecturer_code, full_name, page: pageNum, pageSize: size });
+    const { total, rows } = await lectureService.listLecturers({ lecturer_code, full_name, faculty_id, no_major, page: pageNum, pageSize: size });
 
     return res.json({ success: true, data: rows, total, page: pageNum, pageSize: size });
   } catch (err) {

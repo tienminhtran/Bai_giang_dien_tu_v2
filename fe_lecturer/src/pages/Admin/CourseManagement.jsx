@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
-import { Download, FileSpreadsheet, Plus, Search } from 'lucide-react'
+import { Download, Edit, FileSpreadsheet, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import courseService from '@/services/courseService'
+import facultyService from '@/services/facultyService'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,45 +16,20 @@ import { downloadCourseExcelTemplate } from '@/components/template_excel/courseT
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50]
 
-const COURSE_FIELDS = [
-	{ key: 'courseCode', label: 'Mã môn học', placeholder: 'VD: CNTT201' },
-	{ key: 'courseName', label: 'Tên môn học', placeholder: 'VD: Lập trình NodeJS' },
-	{ key: 'credits', label: 'Số tín chỉ', placeholder: 'VD: 3', type: 'number' },
-	{ key: 'description', label: 'Mô tả', placeholder: 'VD: Môn học backend NodeJS Express' },
-	{ key: 'isActive', label: 'Đang hoạt động (true/false)', placeholder: 'true', type: 'text' },
-]
+const SELECT_CLS = 'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]'
 
 const emptyForm = {
 	courseCode: '',
 	courseName: '',
 	credits: '',
 	description: '',
+	facultyId: '',
 	isActive: true,
 }
 
-const parseBoolean = (value) => {
-	if (typeof value === 'boolean') return value
-	const text = String(value ?? '').trim().toLowerCase()
-	return ['true', '1', 'yes', 'y', 'on', 'active', 'đang hoạt động'].includes(text)
-}
-
-const getCellValue = (row, keys) => {
-	for (const key of keys) {
-		if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') return row[key]
-	}
-	return ''
-}
-
-const mapRowsToCourses = (rows) => rows.map((row) => ({
-	courseCode: String(getCellValue(row, ['Mã môn học', 'course_code', 'courseCode'])).trim(),
-	courseName: String(getCellValue(row, ['Tên môn học', 'course_name', 'courseName'])).trim(),
-	credits: getCellValue(row, ['Số tín chỉ', 'credits']),
-	description: String(getCellValue(row, ['Mô tả', 'description'])).trim(),
-	isActive: parseBoolean(getCellValue(row, ['Đang hoạt động', 'is_active', 'isActive'])),
-}))
-
-function AddCourseDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, submitting, title = 'Thêm môn học', description = 'Nhập thông tin môn học', submitLabel = 'Lưu môn học' }) {
-	const update = (field) => (e) => onFormChange((prev) => ({ ...prev, [field]: field === 'isActive' ? parseBoolean(e.target.value) : e.target.value }))
+//  Dialog thêm / sửa môn học 
+function AddCourseDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, submitting, faculties, title = 'Thêm môn học', description = 'Nhập thông tin môn học', submitLabel = 'Lưu môn học' }) {
+	const set = (field, value) => onFormChange((prev) => ({ ...prev, [field]: value }))
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -64,12 +40,57 @@ function AddCourseDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, s
 				</DialogHeader>
 
 				<div className="grid gap-4 py-2 sm:grid-cols-2">
-					{COURSE_FIELDS.map(({ key, label, placeholder, type }) => (
-						<div key={key} className="space-y-2 sm:col-span-1">
-							<label className="text-sm font-semibold">{label}</label>
-							<Input type={type || 'text'} value={form[key]} onChange={update(key)} placeholder={placeholder} />
-						</div>
-					))}
+					{/* Mã môn học */}
+					<div className="space-y-2">
+						<label className="text-sm font-semibold">Mã môn học</label>
+						<Input value={form.courseCode} onChange={(e) => set('courseCode', e.target.value)} placeholder="VD: CNTT201" />
+					</div>
+
+					{/* Tên môn học */}
+					<div className="space-y-2">
+						<label className="text-sm font-semibold">Tên môn học</label>
+						<Input value={form.courseName} onChange={(e) => set('courseName', e.target.value)} placeholder="VD: Lập trình NodeJS" />
+					</div>
+
+					{/* Số tín chỉ */}
+					<div className="space-y-2">
+						<label className="text-sm font-semibold">Số tín chỉ</label>
+						<Input type="number" value={form.credits} onChange={(e) => set('credits', e.target.value)} placeholder="VD: 3" />
+					</div>
+
+					{/* Khoa chủ quản */}
+					<div className="space-y-2">
+						<label className="text-sm font-semibold">Khoa chủ quản</label>
+						<select
+							value={form.facultyId}
+							onChange={(e) => set('facultyId', e.target.value)}
+							className={SELECT_CLS}
+						>
+							<option value="">-- Chọn khoa --</option>
+							{faculties.map((f) => (
+								<option key={f.id} value={f.id}>{f.facultyName}</option>
+							))}
+						</select>
+					</div>
+
+					{/* Mô tả */}
+					<div className="space-y-2 sm:col-span-2">
+						<label className="text-sm font-semibold">Mô tả</label>
+						<Input value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="VD: Môn học backend NodeJS Express" />
+					</div>
+
+					{/* Trạng thái */}
+					<div className="space-y-2">
+						<label className="text-sm font-semibold">Trạng thái</label>
+						<select
+							value={form.isActive ? 'true' : 'false'}
+							onChange={(e) => set('isActive', e.target.value === 'true')}
+							className={SELECT_CLS}
+						>
+							<option value="true">Đang hoạt động</option>
+							<option value="false">Không hoạt động</option>
+						</select>
+					</div>
 				</div>
 
 				<DialogFooter>
@@ -83,7 +104,8 @@ function AddCourseDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, s
 	)
 }
 
-function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, importResult, onImport, onDownloadErrors, submitting, importedRows }) {
+//  Dialog import Excel 
+function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, importResult, onImport, onDownloadErrors, submitting, importedRows, faculties, onDownloadTemplate }) {
 	const inputRef = useRef(null)
 
 	const handleZoneClick = () => inputRef.current?.click()
@@ -96,7 +118,9 @@ function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, im
 			<DialogContent className="sm:max-w-3xl">
 				<DialogHeader>
 					<DialogTitle>Import môn học bằng Excel</DialogTitle>
-					<DialogDescription>Tải file mẫu, chọn file Excel và nhập danh sách môn học từ vùng tải lên bên dưới.</DialogDescription>
+					<DialogDescription>
+						Tải file mẫu (mỗi sheet = 1 khoa), điền dữ liệu rồi upload. Trạng thái mặc định là <strong>Đang hoạt động</strong>.
+					</DialogDescription>
 				</DialogHeader>
 
 				<div
@@ -113,18 +137,21 @@ function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, im
 					</div>
 					<div className="space-y-1">
 						<p className="text-base font-semibold text-slate-900">Kéo thả file Excel vào đây hoặc bấm để chọn file</p>
-						<p className="text-sm text-slate-500">Chỉ hỗ trợ .xlsx, .xls, .csv</p>
+						<p className="text-sm text-slate-500">Chỉ hỗ trợ .xlsx, .xls</p>
 					</div>
 					{importFile
 						? <div className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200">Đã chọn: {importFile.name}</div>
 						: <div className="text-sm text-slate-400">Chưa có file nào được chọn</div>
 					}
-					<Input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
+					<Input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
 				</div>
 
 				<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-					<p className="text-sm text-slate-600">Tải file mẫu để điền đúng định dạng trước khi nhập.</p>
-					<Button type="button" variant="outline" className="border-[#08387F] bg-white text-[#08387F] hover:bg-slate-50" onClick={downloadCourseExcelTemplate}>
+					<div className="space-y-0.5">
+						<p className="text-sm font-medium text-slate-700">File mẫu nhiều sheet (mỗi sheet = 1 khoa)</p>
+						<p className="text-xs text-slate-500">Cột: Mã môn học, Tên môn học, Số tín chỉ, Mô tả</p>
+					</div>
+					<Button type="button" variant="outline" className="border-[#08387F] bg-white text-[#08387F] hover:bg-slate-50" onClick={onDownloadTemplate}>
 						<Download className="mr-2 h-4 w-4" />
 						Tải file Excel mẫu
 					</Button>
@@ -133,7 +160,7 @@ function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, im
 				{importResult && (
 					<div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
 						<div className="flex flex-wrap gap-2 text-sm font-medium">
-							<span className="rounded-full bg-slate-200 px-3 py-1 text-slate-700">Tổng: {importResult.total}</span>
+							<span className="rounded-full bg-slate-200 px-3 py-1 text-slate-700">Tổng: {importResult.total ?? (importResult.successCount + importResult.errorCount)}</span>
 							<span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">Thành công: {importResult.successCount}</span>
 							{importResult.errorCount > 0 && (
 								<span className="rounded-full bg-rose-100 px-3 py-1 text-rose-700">Lỗi: {importResult.errorCount}</span>
@@ -148,15 +175,17 @@ function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, im
 											<tr className="border-b border-rose-100 bg-rose-50">
 												<th className="px-3 py-2 text-left font-semibold text-rose-700">Dòng</th>
 												<th className="px-3 py-2 text-left font-semibold text-rose-700">Mã môn học</th>
+												<th className="px-3 py-2 text-left font-semibold text-rose-700">Sheet (Khoa)</th>
 												<th className="px-3 py-2 text-left font-semibold text-rose-700">Loại lỗi</th>
 												<th className="px-3 py-2 text-left font-semibold text-rose-700">Lỗi</th>
 											</tr>
 										</thead>
 										<tbody>
-											{importResult.errors.map((err) => (
-												<tr key={`${err.row}-${err.course_code}-${err.message}`} className="border-b border-slate-100 last:border-0">
+											{importResult.errors.map((err, i) => (
+												<tr key={i} className="border-b border-slate-100 last:border-0">
 													<td className="px-3 py-1.5 text-slate-600">{err.row}</td>
 													<td className="px-3 py-1.5 text-slate-800">{err.course_code || '—'}</td>
+													<td className="px-3 py-1.5 text-slate-600">{err.sheet || '—'}</td>
 													<td className="px-3 py-1.5 text-slate-600">{err.type || '—'}</td>
 													<td className="px-3 py-1.5 text-rose-600">{err.message}</td>
 												</tr>
@@ -170,8 +199,8 @@ function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, im
 								</Button>
 							</>
 						)}
-						{importResult.errors.length === 0 && importedRows.length > 0 && (
-							<p className="text-sm text-slate-600">Đã đọc {importedRows.length} dòng từ file Excel.</p>
+						{importResult.errors.length === 0 && (
+							<p className="text-sm text-slate-600">Tất cả {importResult.successCount} môn học đã được nhập thành công.</p>
 						)}
 					</div>
 				)}
@@ -187,6 +216,7 @@ function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, im
 	)
 }
 
+//  Main page 
 export default function CourseManagement() {
 	const [rows, setRows] = useState([])
 	const [total, setTotal] = useState(0)
@@ -195,9 +225,18 @@ export default function CourseManagement() {
 	const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
 	const [searchCode, setSearchCode] = useState('')
 	const [searchName, setSearchName] = useState('')
+
+	const [faculties, setFaculties] = useState([])
+
 	const [addOpen, setAddOpen] = useState(false)
 	const [addSubmitting, setAddSubmitting] = useState(false)
 	const [addForm, setAddForm] = useState(emptyForm)
+
+	const [editOpen, setEditOpen] = useState(false)
+	const [editSubmitting, setEditSubmitting] = useState(false)
+	const [editForm, setEditForm] = useState(emptyForm)
+	const [editId, setEditId] = useState(null)
+
 	const [importOpen, setImportOpen] = useState(false)
 	const [importFile, setImportFile] = useState(null)
 	const [importSubmitting, setImportSubmitting] = useState(false)
@@ -205,6 +244,12 @@ export default function CourseManagement() {
 	const [importedRows, setImportedRows] = useState([])
 
 	const totalPages = Math.max(Math.ceil(total / pageSize), 1)
+
+	useEffect(() => {
+		facultyService.list().then(setFaculties).catch(() => {})
+		fetchRows()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [])
 
 	const fetchRows = async (nextPage = page, nextPageSize = pageSize, courseCode = searchCode, courseName = searchName) => {
 		setLoading(true)
@@ -221,11 +266,6 @@ export default function CourseManagement() {
 		}
 	}
 
-	useEffect(() => {
-		fetchRows()
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [])
-
 	const refreshRows = () => fetchRows(page, pageSize, searchCode, searchName)
 
 	const handleAddCourse = async () => {
@@ -233,7 +273,6 @@ export default function CourseManagement() {
 			toast.error('Vui lòng nhập mã môn học và tên môn học')
 			return
 		}
-
 		try {
 			setAddSubmitting(true)
 			await courseService.create(addForm)
@@ -248,52 +287,107 @@ export default function CourseManagement() {
 		}
 	}
 
-	const openImportDialog = () => {
-		setImportOpen(true)
-		setImportFile(null)
-		setImportResult(null)
-		setImportedRows([])
+	const openEdit = (course) => {
+		setEditId(course.id)
+		setEditForm({
+			courseCode: course.courseCode,
+			courseName: course.courseName,
+			credits: course.credits ?? '',
+			description: course.description || '',
+			facultyId: course.facultyId || '',
+			isActive: course.isActive,
+		})
+		setEditOpen(true)
 	}
 
-	const handleImportOpenChange = (open) => {
-		setImportOpen(open)
-		if (!open) {
-			setImportFile(null)
-			setImportResult(null)
-			setImportedRows([])
+	const handleEditCourse = async () => {
+		if (!editForm.courseCode.trim() || !editForm.courseName.trim()) {
+			toast.error('Vui lòng nhập mã môn học và tên môn học')
+			return
+		}
+		try {
+			setEditSubmitting(true)
+			await courseService.update(editId, editForm)
+			toast.success('Cập nhật môn học thành công')
+			setEditOpen(false)
+			refreshRows()
+		} catch (err) {
+			toast.error(err?.response?.data?.message || 'Cập nhật môn học thất bại')
+		} finally {
+			setEditSubmitting(false)
 		}
 	}
 
+	//  Import: xử lý multi-sheet (mỗi sheet = 1 khoa) 
 	const handleImport = async () => {
 		if (!importFile) {
 			toast.error('Vui lòng chọn file Excel trước khi nhập')
 			return
 		}
-
 		try {
 			setImportSubmitting(true)
 			setImportResult(null)
+
 			const data = await importFile.arrayBuffer()
 			const wb = XLSX.read(data, { type: 'array' })
-			const ws = wb.Sheets[wb.SheetNames[0]]
-			const courses = mapRowsToCourses(XLSX.utils.sheet_to_json(ws, { defval: '' }))
 
-			if (courses.length === 0) {
-				toast.error('File Excel không có dữ liệu hợp lệ hoặc thiếu cột Mã môn học / Tên môn học')
+			// Map tên khoa (lowercase) → id
+			const facultyMap = {}
+			faculties.forEach((f) => { facultyMap[f.facultyName.trim().toLowerCase()] = f.id })
+
+			const allCourses = []
+			const sheetErrors = []
+
+			for (const sheetName of wb.SheetNames) {
+				const facultyId = facultyMap[sheetName.trim().toLowerCase()]
+				if (!facultyId) {
+					sheetErrors.push({ row: '—', course_code: '—', sheet: sheetName, type: 'Không tìm thấy khoa', message: `Sheet "${sheetName}" không khớp với tên khoa nào trong hệ thống` })
+					continue
+				}
+
+				const ws = wb.Sheets[sheetName]
+				const sheetRows = XLSX.utils.sheet_to_json(ws, { defval: '' })
+				for (const row of sheetRows) {
+					allCourses.push({
+						courseCode: String(row['Mã môn học'] ?? '').trim(),
+						courseName: String(row['Tên môn học'] ?? '').trim(),
+						credits: row['Số tín chỉ'],
+						description: String(row['Mô tả'] ?? '').trim(),
+						facultyId,
+						isActive: true,
+						_sheet: sheetName,
+					})
+				}
+			}
+
+			if (allCourses.length === 0 && sheetErrors.length === 0) {
+				toast.error('File Excel không có dữ liệu hợp lệ')
 				return
 			}
 
-			setImportedRows(courses)
-			const result = await courseService.importCourses(courses)
-			setImportResult(result)
+			setImportedRows(allCourses)
+			const result = await courseService.importCourses(allCourses)
+
+			// gắn thêm sheet vào từng lỗi để hiển thị
+			const enrichedErrors = [
+				...sheetErrors,
+				...result.errors.map((e) => ({ ...e, sheet: allCourses[e.row - 1]?._sheet || '—' })),
+			]
+			const finalResult = {
+				total: (result.total ?? result.successCount + result.errorCount) + sheetErrors.length,
+				successCount: result.successCount,
+				errorCount: result.errorCount + sheetErrors.length,
+				errors: enrichedErrors,
+			}
+			setImportResult(finalResult)
 
 			if (result.successCount > 0) refreshRows()
-			if (result.errorCount === 0) {
+			if (finalResult.errorCount === 0) {
 				toast.success(`Đã nhập ${result.successCount} môn học thành công`)
 				setImportOpen(false)
 				setImportFile(null)
 			} else {
-				toast.warning(`Nhập ${result.successCount}/${result.total} thành công — ${result.errorCount} dòng lỗi`)
+				toast.warning(`Nhập ${result.successCount}/${finalResult.total} thành công — ${finalResult.errorCount} lỗi`)
 			}
 		} catch (err) {
 			toast.error(err?.response?.data?.message || 'Không đọc được file Excel hoặc lỗi kết nối')
@@ -302,9 +396,14 @@ export default function CourseManagement() {
 		}
 	}
 
+	const handleImportOpenChange = (open) => {
+		setImportOpen(open)
+		if (!open) { setImportFile(null); setImportResult(null); setImportedRows([]) }
+	}
+
 	const downloadErrors = () => {
 		if (!importResult?.errors?.length) return
-		const rowsForExport = importResult.errors.map((err) => {
+		const rowsForExport = importResult.errors.map((err, i) => {
 			const orig = importedRows[err.row - 1] || {}
 			return {
 				'Dòng': err.row,
@@ -312,15 +411,15 @@ export default function CourseManagement() {
 				'Tên môn học': orig.courseName || '',
 				'Số tín chỉ': orig.credits || '',
 				'Mô tả': orig.description || '',
-				'Đang hoạt động': String(orig.isActive),
+				'Sheet (Khoa)': err.sheet || '',
 				'Loại lỗi': err.type || '',
 				'Lỗi': err.message,
 			}
 		})
 		const ws = XLSX.utils.json_to_sheet(rowsForExport)
-		const wb = XLSX.utils.book_new()
-		XLSX.utils.book_append_sheet(wb, ws, 'Loi')
-		XLSX.writeFile(wb, 'loi_import_mon_hoc.xlsx')
+		const wbOut = XLSX.utils.book_new()
+		XLSX.utils.book_append_sheet(wbOut, ws, 'Loi')
+		XLSX.writeFile(wbOut, 'loi_import_mon_hoc.xlsx')
 	}
 
 	const pageNumbers = (() => {
@@ -361,10 +460,10 @@ export default function CourseManagement() {
 						<Button type="button" variant="outline" className="border-[#08387F] bg-white text-[#08387F] hover:bg-slate-50" onClick={() => setAddOpen(true)}>
 							<Plus className="mr-2 h-4 w-4" /> Thêm môn học
 						</Button>
-						<Button type="button" variant="outline" className="border-[#04ae9a] bg-white text-[#02a28a] hover:bg-slate-50" onClick={openImportDialog}>
+						<Button type="button" variant="outline" className="border-[#04ae9a] bg-white text-[#02a28a] hover:bg-slate-50" onClick={() => { setImportOpen(true); setImportFile(null); setImportResult(null); setImportedRows([]) }}>
 							<FileSpreadsheet className="mr-2 h-4 w-4" /> Thêm bằng Excel
 						</Button>
-						<Button type="button" variant="outline" className="border-[#08387F] bg-white text-[#08387F] hover:bg-slate-50" onClick={downloadCourseExcelTemplate}>
+						<Button type="button" variant="outline" className="border-[#08387F] bg-white text-[#08387F] hover:bg-slate-50" onClick={() => downloadCourseExcelTemplate(faculties)}>
 							<Download className="mr-2 h-4 w-4" /> Tải file mẫu
 						</Button>
 					</div>
@@ -389,35 +488,55 @@ export default function CourseManagement() {
 						<Table>
 							<TableHeader>
 								<TableRow>
-									<TableHead className="w-[180px]">Mã môn học</TableHead>
+									<TableHead className="w-[140px]">Mã môn học</TableHead>
 									<TableHead>Tên môn học</TableHead>
-									<TableHead className="w-[120px]">Số tín chỉ</TableHead>
+									<TableHead className="w-[100px]">Số tín chỉ</TableHead>
+									<TableHead className="w-[180px]">Khoa chủ quản</TableHead>
 									<TableHead>Mô tả</TableHead>
 									<TableHead className="w-[140px]">Trạng thái</TableHead>
+									<TableHead className="w-[80px]"></TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{loading ? (
 									<TableRow>
-										<TableCell colSpan={5} className="py-8 text-center text-slate-400">Đang tải...</TableCell>
+										<TableCell colSpan={7} className="py-8 text-center text-slate-400">Đang tải...</TableCell>
 									</TableRow>
 								) : rows.length === 0 ? (
 									<TableRow>
-										<TableCell colSpan={5} className="py-8 text-center text-slate-500">Không tìm thấy môn học phù hợp.</TableCell>
+										<TableCell colSpan={7} className="py-8 text-center text-slate-500">Không tìm thấy môn học phù hợp.</TableCell>
 									</TableRow>
 								) : rows.map((course) => (
 									<TableRow key={course.id}>
 										<TableCell className="font-medium text-slate-900">{course.courseCode}</TableCell>
 										<TableCell>{course.courseName}</TableCell>
 										<TableCell>{course.credits || '—'}</TableCell>
-										<TableCell className="max-w-[360px] truncate">{course.description || '—'}</TableCell>
+										<TableCell className="max-w-[180px] truncate text-slate-600">{course.facultyName || '—'}</TableCell>
+										<TableCell className="max-w-[300px] truncate">{course.description || '—'}</TableCell>
 										<TableCell>
 											<Badge className={course.isActive
-											? 'rounded-none bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
-											: 'rounded-none bg-rose-100 text-rose-700 hover:bg-rose-100'
-										}>
-											{course.isActive ? 'Đang hoạt động' : 'Đã khóa'}
-										</Badge>
+												? 'rounded-none bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
+												: 'rounded-none bg-rose-100 text-rose-700 hover:bg-rose-100'}>
+												{course.isActive ? 'Đang hoạt động' : 'Không hoạt động'}
+											</Badge>
+										</TableCell>
+										<TableCell>
+											<Button type="button" variant="ghost" size="icon-sm" title="Sửa thông tin" onClick={() => openEdit(course)}>
+												<Edit className="h-4 w-4 text-blue-500" />
+											</Button>
+											{/* xóa */}
+											<Button type="button" variant="ghost" size="icon-sm" title="Xóa môn học" onClick={() => {
+												if (window.confirm(`Bạn có chắc muốn xóa môn học "${course.courseName}"?`)) {
+													courseService.delete(course.id).then(() => {
+														toast.success('Xóa môn học thành công')
+														refreshRows()
+													}).catch((err) => {
+														toast.error(err?.response?.data?.message || 'Xóa môn học thất bại')
+													})
+												}
+											}}>
+												<Trash2 className="h-4 w-4 text-red-500" />
+											</Button>
 										</TableCell>
 									</TableRow>
 								))}
@@ -466,6 +585,20 @@ export default function CourseManagement() {
 				onFormChange={setAddForm}
 				onSubmit={handleAddCourse}
 				submitting={addSubmitting}
+				faculties={faculties}
+			/>
+
+			<AddCourseDialog
+				isOpen={editOpen}
+				onOpenChange={(open) => { setEditOpen(open); if (!open) setEditId(null) }}
+				form={editForm}
+				onFormChange={setEditForm}
+				onSubmit={handleEditCourse}
+				submitting={editSubmitting}
+				faculties={faculties}
+				title="Chỉnh sửa môn học"
+				description="Cập nhật thông tin môn học"
+				submitLabel="Lưu thay đổi"
 			/>
 
 			<ImportCourseDialog
@@ -478,6 +611,8 @@ export default function CourseManagement() {
 				onDownloadErrors={downloadErrors}
 				submitting={importSubmitting}
 				importedRows={importedRows}
+				faculties={faculties}
+				onDownloadTemplate={() => downloadCourseExcelTemplate(faculties)}
 			/>
 		</div>
 	)

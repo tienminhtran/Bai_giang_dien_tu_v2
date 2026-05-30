@@ -125,11 +125,22 @@ CREATE TABLE [dbo].[courses](
     [course_name]   [nvarchar](255)     NOT NULL,
     [credits]       [int]               NULL,
     [description]   [nvarchar](max)     NULL,
+    [count_manager] [int]               NOT NULL CONSTRAINT [DF_courses_count_Manager] DEFAULT (1),
     [is_active]     [bit]               NOT NULL,
     [created_at]    [datetime]          NOT NULL,
 PRIMARY KEY CLUSTERED ([id] ASC),
 UNIQUE ([course_code])
 ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
+ALTER TABLE [elearning_bgdt].[dbo].[courses]
+ADD [faculty_id] UNIQUEIDENTIFIER NULL;
+GO
+
+ALTER TABLE [elearning_bgdt].[dbo].[courses]
+ADD CONSTRAINT [FK_courses_faculties]
+FOREIGN KEY ([faculty_id])
+REFERENCES [elearning_bgdt].[dbo].[faculties]([id]);
 GO
 
 -- ================================================================

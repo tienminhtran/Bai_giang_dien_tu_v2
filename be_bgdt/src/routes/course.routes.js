@@ -13,4 +13,10 @@ router.post('/', authenticate, authorize('admin'), courseController.create);
 // POST /api/courses/import - import nhiều môn học (admin)
 router.post('/import', authenticate, authorize('admin'), courseController.importCourses);
 
+// PUT /api/courses/:id - cập nhật môn học (admin)
+router.put('/:id', authenticate, authorize('admin'), courseController.update);
+
+// DELETE /api/courses/:id - xóa môn học (admin)
+router.delete('/:id', authenticate, authorize('admin'), courseController.remove);
+
 module.exports = router;

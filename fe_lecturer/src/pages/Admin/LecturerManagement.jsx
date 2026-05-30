@@ -4,6 +4,7 @@ import { Download, FileSpreadsheet, Lock, Unlock, Plus, Search, Edit, Key } from
 import { toast } from 'sonner'
 import lectureService from '@/services/lectureService'
 import facultyService from '@/services/facultyService'
+import majorService from '@/services/majorService'
 import academicDegreeService from '@/services/academicDegreeService'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,9 +22,9 @@ const emptyForm = {
   fullName: '',
   email: '',
   facultyId: '',
+  majorId: '',
   academicDegree: '',
   phone: '',
-  avatarUrl: '',
   isActive: true,
 }
 
@@ -38,6 +39,8 @@ function SortIcon({ column, sortConfig }) {
 
 export default function LecturerManagement() {
   const [faculties, setFaculties]         = useState([])
+  const [majors, setMajors]               = useState([])
+  const [filteredMajors, setFilteredMajors] = useState([])
   const [degreeOptions, setDegreeOptions] = useState([])
   const [lecturers, setLecturers] = useState([])
   const [total, setTotal] = useState(0)
@@ -75,8 +78,23 @@ export default function LecturerManagement() {
 
   useEffect(() => {
     facultyService.list().then(setFaculties).catch(() => {})
+    majorService.listAll().then(setMajors).catch(() => {})
     academicDegreeService.list().then(setDegreeOptions).catch(() => {})
   }, [])
+
+  // Lọc chuyên ngành theo khoa được chọn trong form
+  useEffect(() => {
+    if (form.facultyId) {
+      setFilteredMajors(majors.filter((m) => m.facultyId === form.facultyId))
+    } else {
+      setFilteredMajors(majors)
+    }
+    // Reset majorId nếu không còn trong danh sách mới
+    setForm((cur) => {
+      const still = majors.some((m) => m.id === cur.majorId && (!form.facultyId || m.facultyId === form.facultyId))
+      return still ? cur : { ...cur, majorId: '' }
+    })
+  }, [form.facultyId, majors])
 
   useEffect(() => {
     fetchLecturers(currentPage, pageSize, searchCode, searchName)
@@ -120,9 +138,9 @@ export default function LecturerManagement() {
         fullName: lecturer.fullName || '',
         email: lecturer.email || '',
         facultyId: lecturer.facultyId || '',
+        majorId: lecturer.majorId || '',
         academicDegree: lecturer.academicDegree || '',
         phone: lecturer.phone || '',
-        avatarUrl: lecturer.avatarUrl || '',
         isActive: Boolean(lecturer.isActive),
       })
     } else {
@@ -178,7 +196,6 @@ export default function LecturerManagement() {
         facultyName:    String(row.facultyName   || row['Tên khoa']      || row['Khoa']            || row['faculty_name'] || '').trim() || undefined,
         academicDegree: String(row.academicDegree|| row['Học vị']        || row['academic_degree'] || '').trim() || undefined,
         phone:          String(row.phone         || row['Số điện thoại'] || '').trim(),
-        avatarUrl:      String(row.avatarUrl     || row['avatar_url']    || '').trim(),
       })).filter((item) => item.lecturerCode && item.fullName)
 
       if (lecturersToImport.length === 0) {
@@ -231,7 +248,6 @@ export default function LecturerManagement() {
       'Tên khoa':      'Công nghệ thông tin',
       'Học vị':        'Thạc sĩ',
       'Số điện thoại': '0901234567',
-      'avatar_url':    '',
     }]
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
@@ -335,15 +351,14 @@ export default function LecturerManagement() {
       const { rows } = await lectureService.list({ lecturerCode: searchCode, fullName: searchName, page: 1, pageSize: Math.max(total, 1) })
       const data = rows.map((item, index) => ({
         STT: index + 1,
-        user_id: item.userId,
         'Mã giảng viên': item.lecturerCode,
         'Họ tên': item.fullName,
         Email: item.email,
         Khoa: item.facultyName,
+        'Chuyên ngành': item.majorName,
         'Học vị': item.academicDegree,
         'Số điện thoại': item.phone,
-        avatar_url: item.avatarUrl,
-        is_active: item.isActive ? 1 : 0,
+        'Trạng thái': item.isActive ? 'Hoạt động' : 'Đã khóa',
       }))
       const ws = XLSX.utils.json_to_sheet(data)
       const wb = XLSX.utils.book_new()
@@ -420,14 +435,15 @@ export default function LecturerManagement() {
               <TableHeader>
                 <TableRow>
                   {[
-                    { key: 'lecturerCode',  label: 'Mã GV' },
-                    { key: 'fullName',      label: 'Họ tên' },
-                    { key: 'facultyName',   label: 'Khoa' },
+                    { key: 'lecturerCode',   label: 'Mã GV' },
+                    { key: 'fullName',       label: 'Họ tên' },
+                    { key: 'facultyName',    label: 'Khoa' },
+                    { key: 'majorName',      label: 'Chuyên ngành' },
                     { key: 'academicDegree', label: 'Học vị' },
-                    { key: 'email',         label: 'Email' },
-                    { key: 'phone',         label: 'Số điện thoại' },
-                    { key: 'isActive',      label: 'Trạng thái' },
-                    { key: null,            label: 'Hành động' },
+                    { key: 'email',          label: 'Email' },
+                    { key: 'phone',          label: 'Số điện thoại' },
+                    { key: 'isActive',       label: 'Trạng thái' },
+                    { key: null,             label: 'Hành động' },
                   ].map(({ key, label }) => (
                     <TableHead key={label} className={key ? 'cursor-pointer select-none whitespace-nowrap' : undefined} onClick={key ? () => setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' })) : undefined}>
                       {label}
@@ -438,15 +454,16 @@ export default function LecturerManagement() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={8} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
                 ) : sortedLecturers.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="py-8 text-center text-slate-500">Không tìm thấy giảng viên phù hợp.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="py-8 text-center text-slate-500">Không tìm thấy giảng viên phù hợp.</TableCell></TableRow>
                 ) : (
                   sortedLecturers.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-semibold text-slate-900">{item.lecturerCode}</TableCell>
                       <TableCell>{item.fullName}</TableCell>
                       <TableCell>{item.facultyName || '—'}</TableCell>
+                      <TableCell>{item.majorName || '—'}</TableCell>
                       <TableCell>{item.academicDegree || '—'}</TableCell>
                       <TableCell>{item.email || '—'}</TableCell>
                       <TableCell>{item.phone || '—'}</TableCell>
@@ -505,6 +522,7 @@ export default function LecturerManagement() {
         </CardContent>
       </Card>
 
+      {/* Dialog thêm/sửa giảng viên */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setEditing(null); resetForm() } }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -517,7 +535,6 @@ export default function LecturerManagement() {
               ['Họ tên', 'fullName', 'VD: Nguyễn Văn A'],
               ['Email', 'email', 'gv@school.edu.vn'],
               ['Số điện thoại', 'phone', 'VD: 0901234567'],
-              ['Avatar URL', 'avatarUrl', 'https://...'],
             ].map(([label, field, placeholder]) => (
               <div key={field} className="space-y-2">
                 <label className="text-sm font-semibold">{label}</label>
@@ -528,12 +545,25 @@ export default function LecturerManagement() {
               <label className="text-sm font-semibold">Khoa</label>
               <select
                 value={form.facultyId}
-                onChange={(e) => setForm((cur) => ({ ...cur, facultyId: e.target.value }))}
+                onChange={(e) => setForm((cur) => ({ ...cur, facultyId: e.target.value, majorId: '' }))}
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]"
               >
                 <option value="">-- Chọn khoa --</option>
                 {faculties.map((f) => (
                   <option key={f.id} value={f.id}>{f.facultyName}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Chuyên ngành</label>
+              <select
+                value={form.majorId}
+                onChange={(e) => setForm((cur) => ({ ...cur, majorId: e.target.value }))}
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]"
+              >
+                <option value="">-- Chọn chuyên ngành --</option>
+                {filteredMajors.map((m) => (
+                  <option key={m.id} value={m.id}>{m.majorName}</option>
                 ))}
               </select>
             </div>
@@ -558,6 +588,7 @@ export default function LecturerManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog import Excel */}
       <Dialog open={isImportOpen} onOpenChange={(open) => { setIsImportOpen(open); if (!open) { setImportFile(null); setImportResult(null); setImportedRows([]) } }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>

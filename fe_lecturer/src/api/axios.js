@@ -11,4 +11,23 @@ instance.interceptors.request.use((config) => {
   return config
 })
 
+instance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status
+    if (status === 401) {
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('activeRole')
+      window.location.href = '/login'
+    } else if (status === 403) {
+      // Không có quyền với role hiện tại → về trang chọn role
+      localStorage.removeItem('activeRole')
+      window.location.href = '/me'
+    }
+    return Promise.reject(error)
+  }
+)
+
 export default instance

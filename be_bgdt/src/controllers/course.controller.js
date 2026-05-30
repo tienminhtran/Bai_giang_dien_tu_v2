@@ -50,8 +50,31 @@ const importCourses = async (req, res) => {
     }
 };
 
+const update = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const course = await courseService.updateCourse(id, req.body || {});
+        return res.json({ success: true, message: 'Cập nhật môn học thành công', data: course });
+    } catch (err) {
+        console.error(err);
+        return res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Lỗi server' });
+    }
+};
+
+const remove = async (req, res) => {
+    try {
+        await courseService.deleteCourse(req.params.id);
+        return res.json({ success: true, message: 'Xóa môn học thành công' });
+    } catch (err) {
+        console.error(err);
+        return res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Lỗi server' });
+    }
+};
+
 module.exports = {
     list,
     create,
+    update,
+    remove,
     importCourses,
 };

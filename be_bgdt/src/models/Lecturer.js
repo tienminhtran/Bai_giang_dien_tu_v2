@@ -29,16 +29,16 @@ module.exports = (sequelize) => {
       type: DataTypes.UUID,
       allowNull: true,
     },
+    major_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     academic_degree: {
       type: DataTypes.STRING(50),
       allowNull: true,
     },
     phone: {
       type: DataTypes.STRING(15),
-      allowNull: true,
-    },
-    avatar_url: {
-      type: DataTypes.STRING(500),
       allowNull: true,
     },
     is_active: {

@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 const emptyForm = { facultyName: '' }
 
-// ── Dialog thêm / sửa khoa ─────────────────────────────────────────────────
+//  Dialog thêm / sửa khoa 
 function FacultyDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, submitting, editing }) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -52,7 +52,7 @@ function FacultyDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, sub
   )
 }
 
-// ── Dialog import Excel ────────────────────────────────────────────────────
+//  Dialog import Excel 
 function ImportDialog({ isOpen, onOpenChange, importFile, onFileChange, importResult, onImport, onDownloadErrors, submitting }) {
   const inputRef = useRef(null)
   const handleZoneClick  = () => inputRef.current?.click()
@@ -147,7 +147,7 @@ function ImportDialog({ isOpen, onOpenChange, importFile, onFileChange, importRe
   )
 }
 
-// ── Download template ──────────────────────────────────────────────────────
+//  Download template 
 const downloadTemplate = () => {
   const sample = [
     { 'Tên khoa': 'Công nghệ thông tin' },
@@ -161,7 +161,7 @@ const downloadTemplate = () => {
   XLSX.writeFile(wb, 'mau_import_khoa_vien.xlsx')
 }
 
-// ── Trang chính ────────────────────────────────────────────────────────────
+//  Trang chính 
 export default function FacultyManagement() {
   const [faculties, setFaculties]   = useState([])
   const [loading, setLoading]       = useState(false)
@@ -198,12 +198,12 @@ export default function FacultyManagement() {
     f.facultyName.toLowerCase().includes(search.trim().toLowerCase())
   )
 
-  // ── Mở dialog thêm / sửa ──────────────────────────────────────────────
+  //  Mở dialog thêm / sửa 
   const openCreate  = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true) }
   const openEdit    = (f) => { setEditing(f); setForm({ facultyName: f.facultyName }); setDialogOpen(true) }
   const closeDialog = (open) => { setDialogOpen(open); if (!open) { setEditing(null); setForm(emptyForm) } }
 
-  // ── Lưu (tạo hoặc cập nhật) ───────────────────────────────────────────
+  //  Lưu (tạo hoặc cập nhật) 
   const handleSubmit = async () => {
     if (!form.facultyName.trim()) { toast.error('Vui lòng nhập tên khoa/viện'); return }
     setSubmitting(true)
@@ -226,7 +226,7 @@ export default function FacultyManagement() {
     }
   }
 
-  // ── Xóa ───────────────────────────────────────────────────────────────
+  //  Xóa 
   const handleDelete = async () => {
     if (!deleteTarget) return
     try {
@@ -240,7 +240,7 @@ export default function FacultyManagement() {
     }
   }
 
-  // ── Import Excel ───────────────────────────────────────────────────────
+  //  Import Excel 
   const openImport  = () => { setImportOpen(true); setImportFile(null); setImportResult(null); setImportedRows([]) }
   const closeImport = (open) => {
     setImportOpen(open)
@@ -305,10 +305,10 @@ export default function FacultyManagement() {
 
   return (
     <div className="space-y-6">
-      {/* ── Card 1: Filter + Actions ── */}
+      {/*  Card 1: Filter + Actions  */}
       <Card className="border-slate-200 shadow-sm">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl font-black text-[#08387F]">Quản lý Khoa/Viện</CardTitle>
+          <CardTitle className="text-2xl font-black text-[#08387F]">Quản lý Khoa/Viện/Phòng ban</CardTitle>
           <CardDescription>Thêm, sửa, xóa và import danh sách khoa/viện trong hệ thống.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -355,7 +355,7 @@ export default function FacultyManagement() {
         </CardContent>
       </Card>
 
-      {/* ── Card 2: Bảng danh sách ── */}
+      {/*  Card 2: Bảng danh sách  */}
       <Card className="border-slate-200 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg font-bold text-slate-900">Danh sách Khoa/Viện</CardTitle>
@@ -402,7 +402,7 @@ export default function FacultyManagement() {
         </CardContent>
       </Card>
 
-      {/* ── Dialog thêm/sửa ── */}
+      {/*  Dialog thêm/sửa  */}
       <FacultyDialog
         isOpen={dialogOpen}
         onOpenChange={closeDialog}
@@ -413,7 +413,7 @@ export default function FacultyManagement() {
         editing={editing}
       />
 
-      {/* ── Dialog import Excel ── */}
+      {/*  Dialog import Excel  */}
       <ImportDialog
         isOpen={importOpen}
         onOpenChange={closeImport}
@@ -425,7 +425,7 @@ export default function FacultyManagement() {
         submitting={importSubmitting}
       />
 
-      {/* ── Dialog xác nhận xóa ── */}
+      {/*  Dialog xác nhận xóa  */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
         <AlertDialogContent>
           <AlertDialogHeader>

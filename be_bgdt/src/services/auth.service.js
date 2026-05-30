@@ -71,7 +71,7 @@ const login = async ({ username, password, client_id }) => {
   } else {
     profile = await Lecturer.findOne({
       where: { user_id: user.id },
-      attributes: ['id', 'lecturer_code', 'full_name', 'email', 'faculty_id', 'avatar_url'],
+      attributes: ['id', 'lecturer_code', 'full_name', 'email', 'faculty_id', 'major_id'],
     });
   }
 
@@ -122,7 +122,7 @@ const getMe = async (userId) => {
     // lecturer, council, admin
     profile = await Lecturer.findOne({
       where: { user_id: userId },
-      attributes: ['id', 'lecturer_code', 'full_name', 'email', 'faculty_id', 'phone', 'avatar_url', 'is_active'],
+      attributes: ['id', 'lecturer_code', 'full_name', 'email', 'faculty_id', 'major_id', 'phone', 'is_active'],
     });
   }
 

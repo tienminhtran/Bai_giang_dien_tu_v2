@@ -7,6 +7,8 @@ const toFrontend = (course) => ({
 	courseName: course.course_name,
 	credits: course.credits ?? '',
 	description: course.description || '',
+	facultyId: course.faculty_id || '',
+	facultyName: course.faculty?.faculty_name || '',
 	isActive: Boolean(course.is_active),
 })
 
@@ -26,9 +28,23 @@ const create = async (form) => {
 		course_name: form.courseName?.trim(),
 		credits: form.credits === '' || form.credits === null || form.credits === undefined ? undefined : Number(form.credits),
 		description: form.description?.trim() || undefined,
+		faculty_id: form.facultyId || undefined,
 		is_active: form.isActive,
 	}
 	const res = await api.post(COURSE_EP.CREATE, body)
+	return res.data
+}
+
+const update = async (id, form) => {
+	const body = {
+		course_code: form.courseCode?.trim(),
+		course_name: form.courseName?.trim(),
+		credits: form.credits === '' || form.credits === null || form.credits === undefined ? null : Number(form.credits),
+		description: form.description?.trim() || null,
+		faculty_id: form.facultyId || null,
+		is_active: form.isActive,
+	}
+	const res = await api.put(`${COURSE_EP.UPDATE}/${id}`, body)
 	return res.data
 }
 
@@ -38,10 +54,16 @@ const importCourses = async (courses) => {
 		course_name: String(form.courseName || '').trim(),
 		credits: form.credits === '' || form.credits === null || form.credits === undefined ? undefined : Number(form.credits),
 		description: form.description?.trim() || undefined,
-		is_active: form.isActive,
+		faculty_id: form.facultyId || undefined,
+		is_active: true,
 	}))
 	const res = await api.post(COURSE_EP.IMPORT, body)
 	return res.data.data
 }
 
-export default { list, create, importCourses }
+const remove = async (id) => {
+	const res = await api.delete(`/courses/${id}`)
+	return res.data
+}
+
+export default { list, create, update, delete: remove, importCourses }

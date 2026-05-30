@@ -22,7 +22,7 @@ const formatDate = (val) => {
 	try { return new Date(val).toLocaleDateString('vi-VN') } catch { return val }
 }
 
-// ── Dialog thêm / sửa ──────────────────────────────────────────────────────
+//  Dialog thêm / sửa 
 function TermDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, submitting, isEdit }) {
 	const update = (field) => (e) => {
 		const value = field === 'isActive' ? e.target.checked : e.target.value
@@ -101,7 +101,7 @@ function TermDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, submit
 	)
 }
 
-// ── Trang chính ────────────────────────────────────────────────────────────
+//  Trang chính 
 export default function SemesterManagement() {
 	const [rows, setRows]           = useState([])
 	const [total, setTotal]         = useState(0)
@@ -149,14 +149,14 @@ export default function SemesterManagement() {
 		fetchRows(1, pageSize, '', '', '')
 	}
 
-	// ── Thêm mới ──────────────────────────────────────────────────────────────
+	//  Thêm mới 
 	const openAddDialog = () => {
 		setEditTarget(null)
 		setDialogForm(emptyForm)
 		setDialogOpen(true)
 	}
 
-	// ── Sửa ────────────────────────────────────────────────────────────────────
+	//  Sửa 
 	const openEditDialog = (term) => {
 		setEditTarget(term)
 		setDialogForm({
@@ -192,7 +192,7 @@ export default function SemesterManagement() {
 		}
 	}
 
-	// ── Phân trang ─────────────────────────────────────────────────────────────
+	//  Phân trang 
 	const pageNumbers = (() => {
 		if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
 		const pages = [1]

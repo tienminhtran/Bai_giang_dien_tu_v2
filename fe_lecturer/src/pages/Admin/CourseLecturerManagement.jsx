@@ -32,7 +32,7 @@ const formatDate = (val) => {
   try { return new Date(val).toLocaleDateString('vi-VN') } catch { return val }
 }
 
-// ── Dialog phân công mới ───────────────────────────────────────────────────
+//  Dialog phân công mới 
 function AssignDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, submitting }) {
   const set = (field) => (e) => onFormChange((p) => ({ ...p, [field]: e.target.value }))
   return (
@@ -73,7 +73,7 @@ function AssignDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, subm
   )
 }
 
-// ── Dialog sửa quyền ───────────────────────────────────────────────────────
+//  Dialog sửa quyền 
 function EditRoleDialog({ isOpen, onOpenChange, record, roleName, onRoleChange, onSubmit, submitting }) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -108,7 +108,7 @@ function EditRoleDialog({ isOpen, onOpenChange, record, roleName, onRoleChange, 
   )
 }
 
-// ── Template download ──────────────────────────────────────────────────────
+//  Template download 
 const downloadTemplate = () => {
   const sample = [
     { 'Mã môn học': '010113', 'Mã giảng viên': '04112003', 'Quyền': 'manager' },
@@ -122,7 +122,7 @@ const downloadTemplate = () => {
   XLSX.writeFile(wb, 'mau_import_phan_cong.xlsx')
 }
 
-// ── Mapper dòng Excel → object ─────────────────────────────────────────────
+//  Mapper dòng Excel → object 
 const mapRowsToAssignments = (rows = []) => {
   const ROLE_ALIAS = {
     manager: 'manager', 'quản lý': 'manager', 'quan ly': 'manager',
@@ -142,7 +142,7 @@ const mapRowsToAssignments = (rows = []) => {
     .filter((r) => r.courseCode && r.lecturerCode && ['manager', 'member'].includes(r.roleName))
 }
 
-// ── Dialog Import Excel ────────────────────────────────────────────────────
+//  Dialog Import Excel 
 function ImportDialog({ isOpen, onOpenChange, importFile, onFileChange, importResult, onImport, onDownloadErrors, submitting }) {
   const inputRef = useRef(null)
   const handleZoneClick   = () => inputRef.current?.click()
@@ -239,7 +239,7 @@ function ImportDialog({ isOpen, onOpenChange, importFile, onFileChange, importRe
   )
 }
 
-// ── Trang chính ────────────────────────────────────────────────────────────
+//  Trang chính 
 export default function CourseLecturerManagement() {
   const [rows, setRows]       = useState([])
   const [total, setTotal]     = useState(0)
@@ -308,7 +308,7 @@ export default function CourseLecturerManagement() {
   const handleSearch = () => fetchRows(1, pageSize, filters)
   const handleReset  = () => { setFilters(emptyFilters); fetchRows(1, pageSize, emptyFilters) }
 
-  // ── Phân công mới ──────────────────────────────────────────────────────
+  //  Phân công mới 
   const handleAssign = async () => {
     if (!assignForm.courseCode.trim() || !assignForm.lecturerCode.trim()) {
       toast.error('Vui lòng nhập mã môn học và mã giảng viên')
@@ -328,7 +328,7 @@ export default function CourseLecturerManagement() {
     }
   }
 
-  // ── Sửa quyền ─────────────────────────────────────────────────────────
+  //  Sửa quyền 
   const openRoleEdit = (record) => {
     setRoleRecord(record)
     setRoleValue(record.roleName)
@@ -349,7 +349,7 @@ export default function CourseLecturerManagement() {
     }
   }
 
-  // ── Toggle trạng thái ──────────────────────────────────────────────────
+  //  Toggle trạng thái 
   const handleToggleStatus = async (record) => {
     try {
       await courseLecturerService.updateStatus(record.id, !record.isActive)
@@ -360,7 +360,7 @@ export default function CourseLecturerManagement() {
     }
   }
 
-  // ── Xuất Excel ─────────────────────────────────────────────────────────
+  //  Xuất Excel 
   const handleExport = async () => {
     const loadingToast = toast.loading('Đang tải dữ liệu để xuất Excel...')
     try {
@@ -391,7 +391,7 @@ export default function CourseLecturerManagement() {
     }
   }
 
-  // ── Import Excel ───────────────────────────────────────────────────────
+  //  Import Excel 
   const openImport = () => { setImportOpen(true); setImportFile(null); setImportResult(null); setImportedRows([]) }
   const closeImport = (open) => {
     setImportOpen(open)
@@ -450,7 +450,7 @@ export default function CourseLecturerManagement() {
 
   return (
     <div className="space-y-6">
-      {/* ── Card 1: Filter + Actions ── */}
+      {/*  Card 1: Filter + Actions  */}
       <Card className="border-slate-200 shadow-sm">
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl font-black text-[#08387F]">Phân quyền môn học</CardTitle>
@@ -533,7 +533,7 @@ export default function CourseLecturerManagement() {
         </CardContent>
       </Card>
 
-      {/* ── Card 2: Table ── */}
+      {/*  Card 2: Table  */}
       <Card className="border-slate-200 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg font-bold text-slate-900">Danh sách phân công</CardTitle>
@@ -640,7 +640,7 @@ export default function CourseLecturerManagement() {
         </CardContent>
       </Card>
 
-      {/* ── Dialog phân công mới ── */}
+      {/*  Dialog phân công mới  */}
       <AssignDialog
         isOpen={assignOpen}
         onOpenChange={(open) => { setAssignOpen(open); if (!open) setAssignForm(emptyAssignForm) }}
@@ -650,7 +650,7 @@ export default function CourseLecturerManagement() {
         submitting={assignSubmitting}
       />
 
-      {/* ── Dialog sửa quyền ── */}
+      {/*  Dialog sửa quyền  */}
       <EditRoleDialog
         isOpen={roleOpen}
         onOpenChange={(open) => { setRoleOpen(open); if (!open) setRoleRecord(null) }}
@@ -661,7 +661,7 @@ export default function CourseLecturerManagement() {
         submitting={roleSubmitting}
       />
 
-      {/* ── Dialog import Excel ── */}
+      {/*  Dialog import Excel  */}
       <ImportDialog
         isOpen={importOpen}
         onOpenChange={closeImport}
