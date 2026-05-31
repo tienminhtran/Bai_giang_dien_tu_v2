@@ -29,6 +29,9 @@ router.post('/import', authenticate, authorize('admin'), upload.single('file'), 
 // GET /api/majors — Admin lấy tất cả chuyên ngành
 router.get('/', authenticate, authorize('admin'), ctrl.listAll);
 
+// GET /api/majors/faculty/:facultyId — Admin lấy chuyên ngành theo khoa (kèm chủ nhiệm ngành)
+router.get('/faculty/:facultyId', authenticate, authorize('admin'), ctrl.listByFaculty);
+
 // GET /api/majors/my-faculty — Trưởng khoa lấy chuyên ngành trong khoa mình
 router.get('/my-faculty', authenticate, authorize('department_head'), ctrl.listMyFaculty);
 

@@ -1,6 +1,7 @@
 const MAJOR_EP = {
-  LIST_ALL:         '/majors',
-  LIST_MINE:        '/majors/my-faculty',
+  LIST_ALL:          '/majors',
+  LIST_BY_FACULTY:   (facultyId) => `/majors/faculty/${facultyId}`,
+  LIST_MINE:         '/majors/my-faculty',
   CREATE:           '/majors',
   CREATE_MINE:      '/majors/my-faculty',
   ADD_LECTURER:     (id) => `/majors/${id}/add-lecturer`,

@@ -2,13 +2,20 @@ import api from '../api/axios'
 import MAJOR_EP from '../constants/endpoints/major.endpoints'
 
 const toFrontend = (m) => ({
-  id: m.id,
-  majorName: m.major_name,
-  facultyId: m.faculty_id,
-  facultyName: m.faculty?.faculty_name || '',
+  id:            m.id,
+  majorName:     m.major_name,
+  facultyId:     m.faculty_id,
+  facultyName:   m.faculty?.faculty_name || '',
   lecturerCount: Array.isArray(m.lecturers) ? m.lecturers.length : 0,
-  isLock: Boolean(m.is_lock),
-  createdAt: m.created_at,
+  isLock:        Boolean(m.is_lock),
+  createdAt:     m.created_at,
+  majorHead:     m.major_head ? {
+    id:             m.major_head.id,
+    lecturerCode:   m.major_head.lecturer_code,
+    fullName:       m.major_head.full_name,
+    academicDegree: m.major_head.academic_degree || '',
+    email:          m.major_head.email || '',
+  } : null,
 })
 
 // Admin lấy tất cả chuyên ngành
@@ -102,4 +109,10 @@ const lockAll = async (isLock, facultyId = null) => {
   return res.data
 }
 
-export default { listAll, listMine, create, createMine, addLecturer, addMyLecturer, update, updateMine, remove, importExcel, downloadTemplate, toggleLock, lockAll }
+// Admin lấy chuyên ngành theo khoa (kèm chủ nhiệm ngành)
+const listByFaculty = async (facultyId) => {
+  const res = await api.get(MAJOR_EP.LIST_BY_FACULTY(facultyId))
+  return res.data.data.map(toFrontend)
+}
+
+export default { listAll, listByFaculty, listMine, create, createMine, addLecturer, addMyLecturer, update, updateMine, remove, importExcel, downloadTemplate, toggleLock, lockAll }

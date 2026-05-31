@@ -3,11 +3,12 @@ const { Op } = require('sequelize');
 const { sequelize, User, Role, UserRole, Lecturer, Faculty, Major, AcademicDegree } = require('../models');
 
 // faculty_id: lọc theo khoa; no_major: chỉ lấy GV chưa có chuyên ngành
-const listLecturers = async ({ lecturer_code, full_name, faculty_id, no_major, page = 1, pageSize = 20 }) => {
+const listLecturers = async ({ lecturer_code, full_name, faculty_id, major_id, no_major, page = 1, pageSize = 20 }) => {
 	const where = {};
 	if (lecturer_code) where.lecturer_code = { [Op.like]: `%${lecturer_code}%` };
 	if (full_name) where.full_name = { [Op.like]: `%${full_name}%` };
 	if (faculty_id) where.faculty_id = faculty_id;
+	if (major_id) where.major_id = major_id;
 	if (no_major === true || no_major === 'true' || no_major === '1') {
 		where.major_id = null;
 	}

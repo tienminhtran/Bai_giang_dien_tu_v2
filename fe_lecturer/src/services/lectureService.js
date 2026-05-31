@@ -17,11 +17,12 @@ const toFrontend = (lecture) => ({
 })
 
 // facultyId: lọc theo khoa; noMajor: chỉ lấy GV chưa có chuyên ngành
-const list = async ({ lecturerCode = '', fullName = '', facultyId = '', noMajor = false, page = 1, pageSize = 10 } = {}) => {
+const list = async ({ lecturerCode = '', fullName = '', facultyId = '', majorId = '', noMajor = false, page = 1, pageSize = 10 } = {}) => {
   const params = { page, pageSize }
   if (lecturerCode) params.lecturer_code = lecturerCode
   if (fullName) params.full_name = fullName
   if (facultyId) params.faculty_id = facultyId
+  if (majorId) params.major_id = majorId
   if (noMajor) params.no_major = true
 
   const res = await api.get(LECTURE_EP.LIST, { params })

@@ -28,6 +28,8 @@ import DepartmentHeadMajorManagement    from './DepartmentHead/MajorManagement'
 import MajorManagementDetail            from './DepartmentHead/MajorManagementDetail'
 import DepartmentHeadCourseManagement   from './DepartmentHead/CourseManagement'
 import AdminMajorManagement             from './Admin/MajorManagement'
+import CourseDetail                     from './Admin/CourseDetail'
+import FacultyDetail                    from './Admin/FacultyDetail'
 import MajorHeadDashboardPage        from './MajorHead/Dashboard'
 
 // ── Cấu hình menu theo role ─────────────────────────────────────────────────
@@ -197,11 +199,13 @@ export default function Dashboard() {
             <Route path="grading-rounds"    element={<div className="text-slate-500 py-10 text-center">Đợt kiểm định — đang phát triển</div>} />
             <Route path="criteria"          element={<div className="text-slate-500 py-10 text-center">Tiêu chí — đang phát triển</div>} />
             <Route path="scores"            element={<div className="text-slate-500 py-10 text-center">Bản điểm — đang phát triển</div>} />
-            <Route path="courses"           element={<CourseManagement />} />
-            <Route path="course-roles"      element={<CourseLecturerManagement />} />
+            <Route path="courses"                          element={<CourseManagement />} />
+            <Route path="courses/:courseCode/detail"    element={<CourseDetail />} />
+            <Route path="course-roles"                  element={<CourseLecturerManagement />} />
             <Route path="semesters"         element={<SemesterManagement />} />
             <Route path="enrollments"       element={<EnrollmentManagement />} />
-            <Route path="faculties"         element={<FacultyManagement />} />
+            <Route path="faculties"                         element={<FacultyManagement />} />
+            <Route path="faculties/:facultyId/detail"   element={<FacultyDetail />} />
             <Route path="majors"            element={<AdminMajorManagement />} />
             <Route path="academic-positions" element={<AcademicPositionManagement />} />
             <Route path="*" element={<Navigate to="/dashboard/admin" replace />} />

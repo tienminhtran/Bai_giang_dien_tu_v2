@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { sequelize, CourseLecturer, Course, Lecturer, CourseRole, User } = require('../models');
+const { sequelize, CourseLecturer, Course, Lecturer, CourseRole, User, Faculty, Major } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { assertManagerLimit } = require('../helpers/courseHelpers');
 
@@ -52,9 +52,13 @@ const listCourseLecturers = async ({
   const includeConfig = [
     {
       model: Lecturer,
-      attributes: ['id', 'lecturer_code', 'full_name', 'email', 'faculty_id'],
+      attributes: ['id', 'lecturer_code', 'full_name', 'email', 'faculty_id', 'major_id', 'academic_degree'],
       where: hasLecturerFilter ? lecturerWhere : undefined,
       required: hasLecturerFilter,
+      include: [
+        { model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'], required: false },
+        { model: Major,   as: 'major',   attributes: ['id', 'major_name'],   required: false },
+      ],
     },
     {
       model: Course,

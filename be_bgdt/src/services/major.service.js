@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const XLSX = require('xlsx');
-const { Major, Faculty, Lecturer } = require('../models');
+const { Major, Faculty, Lecturer, User, Role } = require('../models');
 const { assertDepartmentHead } = require('../helpers/departmentHead');
 const { checkMajorBelongsToFaculty } = require('../helpers/majorHelpers');
 
@@ -387,8 +387,68 @@ const toggleLockMajor = async (majorId, is_lock) => {
   });
 };
 
+// ── Lấy chuyên ngành theo khoa (Admin) — kèm giảng viên chủ nhiệm ngành ──
+const listMajorsByFaculty = async (facultyId) => {
+  if (!facultyId) {
+    const err = new Error('facultyId là bắt buộc');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Lấy tất cả chuyên ngành của khoa, kèm số lượng GV
+  const majors = await Major.findAll({
+    where: { faculty_id: facultyId },
+    order: [['major_name', 'ASC']],
+    include: [
+      { model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] },
+      { model: Lecturer, as: 'lecturers', attributes: ['id'], required: false },
+    ],
+  });
+
+  if (majors.length === 0) return [];
+
+  // Tìm chủ nhiệm ngành (major_head) cho từng chuyên ngành trong 1 query
+  const majorIds = majors.map((m) => m.id);
+
+  const headLecturers = await Lecturer.findAll({
+    where: { major_id: { [Op.in]: majorIds } },
+    attributes: ['id', 'major_id', 'lecturer_code', 'full_name', 'academic_degree', 'email'],
+    include: [{
+      model: User,
+      attributes: ['id'],
+      required: true,
+      include: [{
+        model: Role,
+        through: { attributes: [] },
+        where: { role_name: 'major_head' },
+        required: true,
+      }],
+    }],
+  });
+
+  // Map major_id → giảng viên chủ nhiệm
+  const headByMajorId = {};
+  for (const h of headLecturers) {
+    if (!headByMajorId[h.major_id]) headByMajorId[h.major_id] = h;
+  }
+
+  return majors.map((m) => {
+    const json = m.toJSON();
+    const head = headByMajorId[m.id];
+    json.major_head = head ? {
+      id:              head.id,
+      lecturer_code:   head.lecturer_code,
+      full_name:       head.full_name,
+      academic_degree: head.academic_degree || null,
+      email:           head.email || null,
+    } : null;
+    return json;
+  });
+};
+
 module.exports = {
   listAllMajors,
+  listMajorsByFaculty,
   listMyFacultyMajors,
   createMajor,
   createMajorByDeptHead,

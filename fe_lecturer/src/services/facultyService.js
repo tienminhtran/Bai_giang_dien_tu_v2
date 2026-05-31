@@ -1,7 +1,11 @@
 import api from '../api/axios'
 import FACULTY_EP from '../constants/endpoints/faculty.endpoints'
 
-const toFrontend = (f) => ({ id: f.id, facultyName: f.faculty_name })
+const toFrontend = (f) => ({
+  id:          f.id,
+  facultyName: f.faculty_name,
+  createdAt:   f.created_at || null,
+})
 
 const list = async () => {
   const res = await api.get(FACULTY_EP.LIST)

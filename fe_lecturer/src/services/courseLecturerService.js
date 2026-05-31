@@ -3,10 +3,12 @@ import { COURSE_LECTURER_EP } from '../constants'
 
 const toFrontend = (row) => ({
   id:                     row.id,
-  lecturerCode:           row.Lecturer?.lecturer_code  || '',
-  lecturerName:           row.Lecturer?.full_name      || '',
-  lecturerDept:           row.Lecturer?.department     || '',
-  courseCode:             row.Course?.course_code      || '',
+  lecturerCode:           row.Lecturer?.lecturer_code             || '',
+  lecturerName:           row.Lecturer?.full_name                 || '',
+  lecturerDegree:         row.Lecturer?.academic_degree           || '',
+  lecturerFacultyName:    row.Lecturer?.faculty?.faculty_name     || '',
+  lecturerDept:           row.Lecturer?.major?.major_name         || '',
+  courseCode:             row.Course?.course_code                 || '',
   courseName:             row.Course?.course_name      || '',
   courseActive:           Boolean(row.Course?.is_active),
   roleName:               row.CourseRole?.role_name    || '',

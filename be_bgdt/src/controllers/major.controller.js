@@ -28,6 +28,18 @@ const listMyFaculty = async (req, res) => {
   }
 };
 
+// GET /api/majors/faculty/:facultyId — Admin lấy chuyên ngành theo khoa (kèm chủ nhiệm ngành)
+const listByFaculty = async (req, res) => {
+  try {
+    const { facultyId } = req.params;
+    const data = await majorService.listMajorsByFaculty(facultyId);
+    return res.json({ success: true, data });
+  } catch (err) {
+    console.error(err);
+    return res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+};
+
 // POST /api/majors — Admin tạo chuyên ngành
 const create = async (req, res) => {
   try {
@@ -197,4 +209,4 @@ const lockAll = async (req, res) => {
   }
 };
 
-module.exports = { listAll, listMyFaculty, create, createByDeptHead, addLecturer, addMyLecturer, update, updateMine, remove, importExcel, getTemplate, toggleLock, lockAll };
+module.exports = { listAll, listByFaculty, listMyFaculty, create, createByDeptHead, addLecturer, addMyLecturer, update, updateMine, remove, importExcel, getTemplate, toggleLock, lockAll };

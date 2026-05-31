@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
-import { BadgeInfo, Download, Edit, FileSpreadsheet, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { BadgeInfo, Download, Edit, FileSpreadsheet, LayoutGrid, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import courseService from '@/services/courseService'
 import facultyService from '@/services/facultyService'
@@ -221,7 +222,8 @@ function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, im
 const URL_DEFAULTS = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0] }
 
 export default function CourseManagement() {
-	//  URL state (page, pageSize, filter đã apply) 
+	const navigate = useNavigate()
+	//  URL state (page, pageSize, filter đã apply)
 	const { get, set, resetPage, searchParams } = useUrlState(URL_DEFAULTS)
 	const page     = Number(get('page'))     || 1
 	const pageSize = Number(get('pageSize')) || PAGE_SIZE_OPTIONS[0]
@@ -577,6 +579,9 @@ export default function CourseManagement() {
 											</Badge>
 										</TableCell>
 										<TableCell>
+											<Button type="button" variant="ghost" size="icon-sm" title="Xem chi tiết" onClick={() => navigate(`/dashboard/admin/courses/${course.courseCode}/detail`, { state: { course } })}>
+												<LayoutGrid className="h-4 w-4 text-blue-500" />
+											</Button>
 											<Button type="button" variant="ghost" size="icon-sm" title="Sửa thông tin" onClick={() => openEdit(course)}>
 												<Edit className="h-4 w-4 text-blue-500" />
 											</Button>

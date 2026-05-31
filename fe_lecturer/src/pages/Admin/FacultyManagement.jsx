@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
-import { Download, Edit, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from 'lucide-react'
+import { Download, Edit, FileSpreadsheet, LayoutGrid, Plus, Search, Trash2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import facultyService from '@/services/facultyService'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +14,11 @@ import { Separator } from '@/components/ui/separator'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 const emptyForm = { facultyName: '' }
+
+const formatDate = (val) => {
+  if (!val) return '—'
+  try { return new Date(val).toLocaleDateString('vi-VN') } catch { return val }
+}
 
 //  Dialog thêm / sửa khoa 
 function FacultyDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, submitting, editing }) {
@@ -163,6 +169,7 @@ const downloadTemplate = () => {
 
 //  Trang chính 
 export default function FacultyManagement() {
+  const navigate = useNavigate()
   const [faculties, setFaculties]   = useState([])
   const [loading, setLoading]       = useState(false)
   const [search, setSearch]         = useState('')
@@ -368,15 +375,16 @@ export default function FacultyManagement() {
                 <TableRow>
                   <TableHead className="w-12">STT</TableHead>
                   <TableHead>Tên khoa/viện</TableHead>
+                  <TableHead className="whitespace-nowrap">Ngày tạo</TableHead>
                   <TableHead className="w-px whitespace-nowrap">Hành động</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={3} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="py-8 text-center text-slate-500">
+                    <TableCell colSpan={4} className="py-8 text-center text-slate-500">
                       {search ? 'Không tìm thấy khoa phù hợp.' : 'Chưa có khoa/viện nào.'}
                     </TableCell>
                   </TableRow>
@@ -384,8 +392,12 @@ export default function FacultyManagement() {
                   <TableRow key={f.id}>
                     <TableCell className="text-slate-500">{idx + 1}</TableCell>
                     <TableCell className="font-medium text-slate-900">{f.facultyName}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-slate-500">{formatDate(f.createdAt)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
+                        <Button type="button" variant="ghost" size="icon-sm" title="Xem chi tiết khoa" onClick={() => navigate(`/dashboard/admin/faculties/${f.id}/detail`, { state: { faculty: f } })}>
+                          <LayoutGrid className="h-4 w-4 text-blue-500" />
+                        </Button>
                         <Button type="button" variant="ghost" size="icon-sm" title="Sửa tên khoa" onClick={() => openEdit(f)}>
                           <Edit className="h-4 w-4 text-blue-500" />
                         </Button>
