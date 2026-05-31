@@ -33,6 +33,10 @@ module.exports = (sequelize) => {
       type: DataTypes.UUID,
       allowNull: true,
     },
+    major_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     is_active: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

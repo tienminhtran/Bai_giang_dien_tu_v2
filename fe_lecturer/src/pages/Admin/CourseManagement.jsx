@@ -5,6 +5,7 @@ import { BadgeInfo, Download, Edit, FileSpreadsheet, LayoutGrid, Pencil, Plus, S
 import { toast } from 'sonner'
 import courseService from '@/services/courseService'
 import facultyService from '@/services/facultyService'
+import majorService from '@/services/majorService'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,12 +27,18 @@ const emptyForm = {
 	credits: '',
 	description: '',
 	facultyId: '',
+	majorId: '',
 	isActive: true,
 }
 
-//  Dialog thêm / sửa môn học 
-function AddCourseDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, submitting, faculties, title = 'Thêm môn học', description = 'Nhập thông tin môn học', submitLabel = 'Lưu môn học' }) {
+//  Dialog thêm / sửa môn học
+function AddCourseDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, submitting, faculties, majors = [], title = 'Thêm môn học', description = 'Nhập thông tin môn học', submitLabel = 'Lưu môn học' }) {
 	const set = (field, value) => onFormChange((prev) => ({ ...prev, [field]: value }))
+	const filteredMajors = majors.filter((m) => m.facultyId === form.facultyId)
+
+	const handleFacultyChange = (e) => {
+		onFormChange((prev) => ({ ...prev, facultyId: e.target.value, majorId: '' }))
+	}
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -63,16 +70,27 @@ function AddCourseDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, s
 					{/* Khoa chủ quản */}
 					<div className="space-y-2">
 						<label className="text-sm font-semibold">Khoa chủ quản</label>
-						<select
-							value={form.facultyId}
-							onChange={(e) => set('facultyId', e.target.value)}
-							className={SELECT_CLS}
-						>
+						<select value={form.facultyId} onChange={handleFacultyChange} className={SELECT_CLS}>
 							<option value="">-- Chọn khoa --</option>
 							{faculties.map((f) => (
 								<option key={f.id} value={f.id}>{f.facultyName}</option>
 							))}
 						</select>
+					</div>
+
+					{/* Bộ môn (chuyên ngành) */}
+					<div className="space-y-2 sm:col-span-2">
+						<label className="text-sm font-semibold">Bộ môn / Chuyên ngành</label>
+						<select value={form.majorId} onChange={(e) => set('majorId', e.target.value)} className={SELECT_CLS}
+							disabled={!form.facultyId || filteredMajors.length === 0}>
+							<option value="">-- Chọn bộ môn --</option>
+							{filteredMajors.map((m) => (
+								<option key={m.id} value={m.id}>{m.majorName}</option>
+							))}
+						</select>
+						{!form.facultyId && (
+							<p className="text-xs text-slate-400">Chọn khoa trước để lọc bộ môn.</p>
+						)}
 					</div>
 
 					{/* Mô tả */}
@@ -151,7 +169,7 @@ function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, im
 				<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
 					<div className="space-y-0.5">
 						<p className="text-sm font-medium text-slate-700">File mẫu nhiều sheet (mỗi sheet = 1 khoa)</p>
-						<p className="text-xs text-slate-500">Cột: Mã môn học, Tên môn học, Số tín chỉ, Mô tả</p>
+						<p className="text-xs text-slate-500">Cột: Mã môn học, Tên môn học, Số tín chỉ, Mô tả, Tên chuyên ngành</p>
 					</div>
 					<Button type="button" variant="outline" className="border-[#08387F] bg-white text-[#08387F] hover:bg-slate-50" onClick={onDownloadTemplate}>
 						<Download className="mr-2 h-4 w-4" />
@@ -240,8 +258,9 @@ export default function CourseManagement() {
 	const [total, setTotal] = useState(0)
 	const [loading, setLoading] = useState(false)
 	const [faculties, setFaculties] = useState([])
+	const [majors, setMajors] = useState([])
 
-	//  Dialog state 
+	//  Dialog state
 	const [addOpen, setAddOpen] = useState(false)
 	const [addSubmitting, setAddSubmitting] = useState(false)
 	const [addForm, setAddForm] = useState(emptyForm)
@@ -264,9 +283,10 @@ export default function CourseManagement() {
 
 	const totalPages = Math.max(Math.ceil(total / pageSize), 1)
 
-	//  Load faculties 1 lần 
+	//  Load faculties + majors 1 lần
 	useEffect(() => {
 		facultyService.list().then(setFaculties).catch(() => {})
+		majorService.listAll().then(setMajors).catch(() => {})
 	}, [])
 
 	//  Fetch courses — chạy mỗi khi URL hoặc refreshKey đổi 
@@ -281,11 +301,16 @@ export default function CourseManagement() {
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [searchParams, refreshKey])
 
-	// Sau mutation: về trang 1; nếu đã ở trang 1 thì dùng refreshKey để trigger lại
+	// Sau thêm/xóa/import: về trang 1 (item mới ở trang 1, hoặc trang hiện tại có thể trống sau xóa)
 	const afterMutation = useCallback(() => {
 		resetPage()
 		setRefreshKey((k) => k + 1)
 	}, [resetPage])
+
+	// Sau khi sửa 1 dòng có sẵn: giữ nguyên trang đang xem, chỉ re-fetch
+	const refreshKeepPage = useCallback(() => {
+		setRefreshKey((k) => k + 1)
+	}, [])
 
 	//  Search 
 	const applySearch = () => resetPage({ courseCode: draftCode.trim(), courseName: draftName.trim() })
@@ -319,6 +344,7 @@ export default function CourseManagement() {
 			credits: course.credits ?? '',
 			description: course.description || '',
 			facultyId: course.facultyId || '',
+			majorId: course.majorId || '',
 			isActive: course.isActive,
 		})
 		setEditOpen(true)
@@ -334,7 +360,7 @@ export default function CourseManagement() {
 			await courseService.update(editId, editForm)
 			toast.success('Cập nhật môn học thành công')
 			setEditOpen(false)
-			afterMutation()
+			refreshKeepPage()
 		} catch (err) {
 			toast.error(err?.response?.data?.message || 'Cập nhật môn học thất bại')
 		} finally {
@@ -368,7 +394,7 @@ export default function CourseManagement() {
 			await courseService.updateCountManager(countManagerCourse.id, val)
 			toast.success('Cập nhật giới hạn manager thành công')
 			setCountManagerOpen(false)
-			afterMutation()
+			refreshKeepPage()
 		} catch (err) {
 			toast.error(err?.response?.data?.message || 'Cập nhật thất bại')
 		} finally {
@@ -408,6 +434,7 @@ export default function CourseManagement() {
 						courseName: String(row['Tên môn học'] ?? '').trim(),
 						credits: row['Số tín chỉ'],
 						description: String(row['Mô tả'] ?? '').trim(),
+						majorName: String(row['Tên chuyên ngành'] ?? row['Bộ môn'] ?? '').trim(),
 						facultyId,
 						isActive: true,
 						_sheet: sheetName,
@@ -545,6 +572,7 @@ export default function CourseManagement() {
 									<TableHead>Tên môn học</TableHead>
 									<TableHead className="w-[100px]">Số tín chỉ</TableHead>
 									<TableHead className="w-[180px]">Khoa chủ quản</TableHead>
+									<TableHead className="w-[180px]">Bộ môn</TableHead>
 									{/* <TableHead>Mô tả</TableHead> */}
 									<TableHead className="w-[120px]">Manager tối đa</TableHead>
 									<TableHead className="w-[140px]">Trạng thái</TableHead>
@@ -553,15 +581,16 @@ export default function CourseManagement() {
 							</TableHeader>
 							<TableBody>
 								{loading ? (
-									<TableRow><TableCell colSpan={7} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
+									<TableRow><TableCell colSpan={8} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
 								) : rows.length === 0 ? (
-									<TableRow><TableCell colSpan={7} className="py-8 text-center text-slate-500">Không tìm thấy môn học phù hợp.</TableCell></TableRow>
+									<TableRow><TableCell colSpan={8} className="py-8 text-center text-slate-500">Không tìm thấy môn học phù hợp.</TableCell></TableRow>
 								) : rows.map((course) => (
 									<TableRow key={course.id}>
 										<TableCell className="font-medium text-slate-900">{course.courseCode}</TableCell>
 										<TableCell>{course.courseName}</TableCell>
 										<TableCell>{course.credits || '—'}</TableCell>
 										<TableCell className="max-w-[180px] truncate text-slate-600">{course.facultyName || '—'}</TableCell>
+										<TableCell className="max-w-[180px] truncate text-slate-600">{course.majorName || '—'}</TableCell>
 										{/* <TableCell className="max-w-[300px] truncate">{course.description || '—'}</TableCell> */}
 										<TableCell>
 											<div className="flex items-center gap-1">
@@ -637,6 +666,7 @@ export default function CourseManagement() {
 				onSubmit={handleAddCourse}
 				submitting={addSubmitting}
 				faculties={faculties}
+				majors={majors}
 			/>
 
 			<AddCourseDialog
@@ -647,6 +677,7 @@ export default function CourseManagement() {
 				onSubmit={handleEditCourse}
 				submitting={editSubmitting}
 				faculties={faculties}
+				majors={majors}
 				title="Chỉnh sửa môn học"
 				description="Cập nhật thông tin môn học"
 				submitLabel="Lưu thay đổi"

@@ -490,6 +490,7 @@ export default function FacultyDetail() {
                     <TableHead className="w-10">STT</TableHead>
                     <TableHead className="whitespace-nowrap">Mã môn học</TableHead>
                     <TableHead>Tên môn học</TableHead>
+                    <TableHead className="whitespace-nowrap">Bộ môn</TableHead>
                     <TableHead className="whitespace-nowrap">Số TC</TableHead>
                     <TableHead className="whitespace-nowrap">Manager tối đa</TableHead>
                     <TableHead className="whitespace-nowrap">Trạng thái</TableHead>
@@ -498,14 +499,15 @@ export default function FacultyDetail() {
                 </TableHeader>
                 <TableBody>
                   {coursesLoading ? (
-                    <TableRow><TableCell colSpan={7} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
                   ) : courses.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="py-8 text-center text-slate-500">Chưa có môn học nào.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="py-8 text-center text-slate-500">Chưa có môn học nào.</TableCell></TableRow>
                   ) : courses.map((c, idx) => (
                     <TableRow key={c.id}>
                       <TableCell className="text-slate-500">{(coursePage - 1) * PAGE_SIZE + idx + 1}</TableCell>
                       <TableCell className="whitespace-nowrap font-mono text-xs font-semibold text-slate-900">{c.courseCode}</TableCell>
                       <TableCell className="font-medium text-slate-900">{c.courseName}</TableCell>
+                      <TableCell className="whitespace-nowrap text-sm text-slate-600">{c.majorName || '—'}</TableCell>
                       <TableCell className="text-slate-600">{c.credits || '—'}</TableCell>
                       <TableCell className="text-slate-600">{c.countManager ?? '—'}</TableCell>
                       <TableCell>

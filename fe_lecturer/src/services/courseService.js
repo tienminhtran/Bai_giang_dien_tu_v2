@@ -2,14 +2,16 @@ import api from '../api/axios'
 import { COURSE_EP } from '../constants'
 
 const toFrontend = (course) => ({
-	id: course.id,
-	courseCode: course.course_code,
-	courseName: course.course_name,
-	credits: course.credits ?? '',
-	description: course.description || '',
-	facultyId: course.faculty_id || '',
-	facultyName: course.faculty?.faculty_name || '',
-	isActive: Boolean(course.is_active),
+	id:           course.id,
+	courseCode:   course.course_code,
+	courseName:   course.course_name,
+	credits:      course.credits ?? '',
+	description:  course.description || '',
+	facultyId:    course.faculty_id || '',
+	facultyName:  course.faculty?.faculty_name || '',
+	majorId:      course.major_id || '',
+	majorName:    course.major?.major_name || '',
+	isActive:     Boolean(course.is_active),
 	countManager: course.count_manager ?? 1,
 })
 
@@ -30,6 +32,7 @@ const create = async (form) => {
 		credits: form.credits === '' || form.credits === null || form.credits === undefined ? undefined : Number(form.credits),
 		description: form.description?.trim() || undefined,
 		faculty_id: form.facultyId || undefined,
+		major_id:   form.majorId   || undefined,
 		is_active: form.isActive,
 	}
 	const res = await api.post(COURSE_EP.CREATE, body)
@@ -43,6 +46,7 @@ const update = async (id, form) => {
 		credits: form.credits === '' || form.credits === null || form.credits === undefined ? null : Number(form.credits),
 		description: form.description?.trim() || null,
 		faculty_id: form.facultyId || null,
+		major_id:   form.majorId   || null,
 		is_active: form.isActive,
 	}
 	const res = await api.put(`${COURSE_EP.UPDATE}/${id}`, body)
@@ -55,7 +59,9 @@ const importCourses = async (courses) => {
 		course_name: String(form.courseName || '').trim(),
 		credits: form.credits === '' || form.credits === null || form.credits === undefined ? undefined : Number(form.credits),
 		description: form.description?.trim() || undefined,
-		faculty_id: form.facultyId || undefined,
+		faculty_id:  form.facultyId  || undefined,
+		major_id:    form.majorId    || undefined,
+		major_name:  form.majorName  || undefined,  // lookup by name trên backend
 		is_active: true,
 	}))
 	const res = await api.post(COURSE_EP.IMPORT, body)

@@ -441,6 +441,10 @@ export default function CourseDetail() {
                   <p className="text-slate-800">{courseInfo.facultyName || '—'}</p>
                 </div>
                 <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Bộ môn / Chuyên ngành</p>
+                  <p className="text-slate-800">{courseInfo.majorName || '—'}</p>
+                </div>
+                <div className="space-y-1">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Manager tối đa</p>
                   <p className="text-slate-800">{courseInfo.countManager ?? '—'}</p>
                 </div>

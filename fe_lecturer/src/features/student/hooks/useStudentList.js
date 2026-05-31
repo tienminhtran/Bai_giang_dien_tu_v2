@@ -34,11 +34,16 @@ export function useStudentList() {
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [searchParams, refreshKey])
 
-	// sau mutation: về trang 1, force re-fetch dù đang ở trang 1
+	// sau thêm/import: về trang 1, force re-fetch dù đang ở trang 1
 	const afterMutation = useCallback(() => {
 		resetPage()
 		setRefreshKey((k) => k + 1)
 	}, [resetPage])
+
+	// sau khi sửa/khóa 1 dòng có sẵn: giữ nguyên trang đang xem, chỉ re-fetch
+	const refreshKeepPage = useCallback(() => {
+		setRefreshKey((k) => k + 1)
+	}, [])
 
 	const handleSearch = () =>
 		resetPage({ studentCode: keywordCode.trim(), fullName: keywordName.trim() })
@@ -84,6 +89,7 @@ export function useStudentList() {
 		totalPages, safePage, getPageNumbers,
 		handleSearch,
 		refresh: afterMutation,
+		refreshKeepPage,
 		// cho StudentTable
 		onPageChange:     (p)    => set({ page: p }),
 		onPageSizeChange: (size) => resetPage({ pageSize: size }),

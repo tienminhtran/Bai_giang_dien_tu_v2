@@ -143,6 +143,11 @@ export default function SemesterManagement() {
 		setRefreshKey((k) => k + 1)
 	}, [resetPage])
 
+	// Sau khi sửa 1 dòng có sẵn: giữ nguyên trang đang xem, chỉ re-fetch
+	const refreshKeepPage = useCallback(() => {
+		setRefreshKey((k) => k + 1)
+	}, [])
+
 	const handleSearch = () => resetPage({ academicYear: draftYear.trim(), semester: draftSemester, isActive: draftActive })
 	const handleReset  = () => {
 		setDraftYear(''); setDraftSemester(''); setDraftActive('')
@@ -176,7 +181,8 @@ export default function SemesterManagement() {
 		}
 		try {
 			setDialogSubmitting(true)
-			if (editTarget) {
+			const isEdit = Boolean(editTarget)
+			if (isEdit) {
 				await academicTermService.update(editTarget.id, dialogForm)
 				toast.success('Cập nhật học kỳ thành công')
 			} else {
@@ -184,7 +190,7 @@ export default function SemesterManagement() {
 				toast.success('Tạo học kỳ thành công')
 			}
 			setDialogOpen(false)
-			afterMutation()
+			isEdit ? refreshKeepPage() : afterMutation()
 		} catch (err) {
 			toast.error(err?.response?.data?.message || 'Lưu học kỳ thất bại')
 		} finally {

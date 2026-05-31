@@ -307,6 +307,11 @@ export default function CourseLecturerManagement() {
     setRefreshKey((k) => k + 1)
   }, [resetPage])
 
+  // Sau khi sửa quyền/đổi trạng thái 1 dòng có sẵn: giữ nguyên trang đang xem
+  const refreshKeepPage = useCallback(() => {
+    setRefreshKey((k) => k + 1)
+  }, [])
+
   const handleSearch = () => resetPage(Object.fromEntries(FILTER_KEYS.map((k) => [k, filters[k]])))
   const handleReset  = () => {
     const cleared = Object.fromEntries(FILTER_KEYS.map((k) => [k, '']))
@@ -347,7 +352,7 @@ export default function CourseLecturerManagement() {
       await courseLecturerService.updateRole(roleRecord.id, roleValue)
       toast.success('Cập nhật quyền thành công')
       setRoleOpen(false)
-      afterMutation()
+      refreshKeepPage()
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Cập nhật quyền thất bại')
     } finally {
@@ -360,7 +365,7 @@ export default function CourseLecturerManagement() {
     try {
       await courseLecturerService.updateStatus(record.id, !record.isActive)
       toast.success(record.isActive ? 'Đã vô hiệu hóa phân công' : 'Đã kích hoạt phân công')
-      afterMutation()
+      refreshKeepPage()
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Cập nhật trạng thái thất bại')
     }
@@ -620,13 +625,28 @@ export default function CourseLecturerManagement() {
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <span>Hiển thị</span>
-              <select
-                value={pageSize}
-                onChange={(e) => resetPage({ pageSize: Number(e.target.value) })}
-                className="rounded border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]"
-              >
-                {PAGE_SIZE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <input
+                key={pageSize}
+                type="number"
+                min={1}
+                list="clm-pagesize-options"
+                defaultValue={pageSize}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const v = Math.max(1, Number(e.target.value) || PAGE_SIZE_OPTIONS[0])
+                    if (v !== pageSize) resetPage({ pageSize: v }); else e.target.blur()
+                  }
+                }}
+                onBlur={(e) => {
+                  const v = Math.max(1, Number(e.target.value) || PAGE_SIZE_OPTIONS[0])
+                  if (v !== pageSize) resetPage({ pageSize: v })
+                  else e.target.value = pageSize
+                }}
+                className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]"
+              />
+              <datalist id="clm-pagesize-options">
+                {PAGE_SIZE_OPTIONS.map((s) => <option key={s} value={s} />)}
+              </datalist>
               <span>/ trang — {total} bản ghi</span>
             </div>
 

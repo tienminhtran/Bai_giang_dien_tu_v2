@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { sequelize, Course, Faculty } = require('../models');
+const { sequelize, Course, Faculty, Major } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { checkSingleFaculty } = require('../helpers/courseHelpers');
 
@@ -15,7 +15,10 @@ const listCourses = async ({ course_code, course_name, page = 1, pageSize = 20 }
         Course.findAll({
             where, limit, offset,
             order: [['created_at', 'DESC']],
-            include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+            include: [
+                { model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] },
+                { model: Major,   as: 'major',   attributes: ['id', 'major_name'], required: false },
+            ],
         }),
     ]);
     return { total, rows };
@@ -27,6 +30,7 @@ const normalizeCoursePayload = (payload = {}) => ({
     credits:      payload.credits == null || payload.credits === '' ? null : Number(payload.credits),
     description:  payload.description  == null || payload.description === '' ? null : String(payload.description).trim(),
     faculty_id:   payload.faculty_id == null || payload.faculty_id === '' ? null : String(payload.faculty_id).trim(),
+    major_id:     payload.major_id   == null || payload.major_id   === '' ? null : String(payload.major_id).trim(),
     is_active:    payload.is_active === undefined ? true : Boolean(payload.is_active),
 });
 
@@ -51,6 +55,7 @@ const createCourse = async (payload = {}) => {
         credits:      data.credits,
         description:  data.description,
         faculty_id:   data.faculty_id,
+        major_id:     data.major_id,
         is_active:    data.is_active,
     });
 };
@@ -82,12 +87,22 @@ const importCourses = async (records) => {
                 throw ApiError.conflict('Mã môn học đã tồn tại', 'DUPLICATE_IN_DATABASE');
             }
 
+            // Nếu có major_name thì lookup major_id
+            let major_id = normalized.major_id;
+            if (!major_id && record.major_name) {
+                const majorWhere = { major_name: String(record.major_name).trim() };
+                if (normalized.faculty_id) majorWhere.faculty_id = normalized.faculty_id;
+                const foundMajor = await Major.findOne({ where: majorWhere, attributes: ['id'] });
+                if (foundMajor) major_id = foundMajor.id;
+            }
+
             await Course.create({
                 course_code:  normalized.course_code,
                 course_name:  normalized.course_name,
                 credits:      normalized.credits,
                 description:  normalized.description,
                 faculty_id:   normalized.faculty_id,
+                major_id,
                 is_active:    normalized.is_active,
             });
 
@@ -135,11 +150,15 @@ const updateCourse = async (id, payload = {}) => {
         credits:     data.credits,
         description: data.description,
         faculty_id:  data.faculty_id,
+        major_id:    data.major_id,
         is_active:   data.is_active,
     });
 
     return Course.findByPk(id, {
-        include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+        include: [
+            { model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] },
+            { model: Major,   as: 'major',   attributes: ['id', 'major_name'], required: false },
+        ],
     });
 };
 
@@ -159,7 +178,10 @@ const updateCountManager = async (id, count_manager) => {
 
     await course.update({ count_manager: val });
     return Course.findByPk(id, {
-        include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+        include: [
+            { model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] },
+            { model: Major,   as: 'major',   attributes: ['id', 'major_name'], required: false },
+        ],
     });
 };
 
@@ -179,7 +201,10 @@ const listCoursesByFaculty = async (facultyId, { course_code, course_name, page 
         Course.findAll({
             where, limit, offset,
             order: [['course_name', 'ASC']],
-            include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+            include: [
+                { model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] },
+                { model: Major,   as: 'major',   attributes: ['id', 'major_name'], required: false },
+            ],
         }),
     ]);
 

@@ -69,10 +69,10 @@ export default function LecturerRoleManagement() {
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [searchParams, refreshKey])
 
-	const afterMutation = useCallback(() => {
-		resetPage()
+	// Trang này chỉ sửa quyền của dòng có sẵn → luôn giữ nguyên trang đang xem
+	const refreshKeepPage = useCallback(() => {
 		setRefreshKey((k) => k + 1)
-	}, [resetPage])
+	}, [])
 
 	const openEdit = (lecturer) => {
 		setSelectedLecturer(lecturer)
@@ -88,7 +88,7 @@ export default function LecturerRoleManagement() {
 			toast.success('Cập nhật quyền giảng viên thành công')
 			setEditOpen(false)
 			setSelectedLecturer(null)
-			afterMutation()
+			refreshKeepPage()
 		} catch (err) {
 			toast.error(err?.response?.data?.message || 'Cập nhật quyền giảng viên thất bại')
 		} finally {

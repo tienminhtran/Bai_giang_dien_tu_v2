@@ -21,5 +21,6 @@ router.use('/enrollments',    require('./enrollment.routes'));
 router.use('/academic-terms',    require('./academicterm.routes'));
 router.use('/course-lecturers',  require('./courselecturer.routes'));
 router.use('/department-head',   require('./departmentHead.routes'));
+router.use('/grading-rounds',    require('./gradinground.routes'));
 
 module.exports = router;

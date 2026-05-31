@@ -2,8 +2,8 @@ import * as XLSX from 'xlsx'
 
 export const courseTemplateFilename = 'mau_import_mon_hoc.xlsx'
 
-const HEADER_COLS = ['Mã môn học', 'Tên môn học', 'Số tín chỉ', 'Mô tả']
-const COL_WIDTHS = [{ wch: 18 }, { wch: 32 }, { wch: 14 }, { wch: 40 }]
+const HEADER_COLS = ['Mã môn học', 'Tên môn học', 'Số tín chỉ', 'Mô tả', 'Tên chuyên ngành']
+const COL_WIDTHS = [{ wch: 18 }, { wch: 32 }, { wch: 14 }, { wch: 40 }, { wch: 28 }]
 
 const HEADER_STYLE = {
 	font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
@@ -53,7 +53,7 @@ export function downloadCourseExcelTemplate(faculties: { id: string; facultyName
 	if (faculties.length === 0) {
 		// fallback: 1 sheet mẫu nếu chưa load được danh sách khoa
 		const ws = buildSheet([
-			{ 'Mã môn học': 'CNTT201', 'Tên môn học': 'Lập trình NodeJS', 'Số tín chỉ': 3, 'Mô tả': 'Môn học backend NodeJS Express' },
+			{ 'Mã môn học': 'CNTT201', 'Tên môn học': 'Lập trình NodeJS', 'Số tín chỉ': 3, 'Mô tả': 'Môn học backend NodeJS Express', 'Tên chuyên ngành': 'Kỹ thuật phần mềm' },
 		])
 		XLSX.utils.book_append_sheet(workbook, ws, 'Ten Khoa')
 	} else {

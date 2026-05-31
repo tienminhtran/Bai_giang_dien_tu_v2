@@ -73,7 +73,7 @@ export default function StudentManagement() {
 			toast.success('Cập nhật thông tin sinh viên thành công')
 			setEditOpen(false)
 			setEditStudent(null)
-			list.refresh()
+			list.refreshKeepPage()
 		} catch (err) {
 			toast.error(err?.response?.data?.message || 'Cập nhật thông tin sinh viên thất bại')
 		} finally {
@@ -108,7 +108,7 @@ export default function StudentManagement() {
 		try {
 			await studentService.lockAccount(student.id, action)
 			toast.success(`Đã ${actionLabel} tài khoản sinh viên`)
-			list.refresh()
+			list.refreshKeepPage()
 		} catch (err) {
 			toast.error(err?.response?.data?.message || `${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} tài khoản thất bại`)
 		}
@@ -178,7 +178,7 @@ export default function StudentManagement() {
 			toast.dismiss(loadingToast)
 			if (success > 0) toast.success(`Đã ${actionLabel} ${success} tài khoản sinh viên`)
 			if (fail > 0) toast.error(`${fail} tài khoản ${actionLabel} thất bại`)
-			list.refresh()
+			list.refreshKeepPage()
 		} catch (err) {
 			toast.dismiss(loadingToast)
 			toast.error(err?.response?.data?.message || `${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} toàn bộ thất bại`)

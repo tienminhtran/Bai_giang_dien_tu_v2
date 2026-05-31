@@ -86,10 +86,16 @@ export default function LecturerManagement() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, refreshKey])
 
+  // Sau thêm/import: về trang 1 (item mới ở trang 1)
   const afterMutation = useCallback(() => {
     resetPage()
     setRefreshKey((k) => k + 1)
   }, [resetPage])
+
+  // Sau khi sửa/khóa 1 dòng có sẵn: giữ nguyên trang đang xem, chỉ re-fetch
+  const refreshKeepPage = useCallback(() => {
+    setRefreshKey((k) => k + 1)
+  }, [])
 
   // Lọc chuyên ngành theo khoa được chọn trong form
   useEffect(() => {
@@ -159,7 +165,8 @@ export default function LecturerManagement() {
 
     setSubmitting(true)
     try {
-      if (editing?.id) {
+      const isEdit = Boolean(editing?.id)
+      if (isEdit) {
         await lectureService.update(editing.id, form)
         toast.success('Cập nhật giảng viên thành công')
       } else {
@@ -169,7 +176,7 @@ export default function LecturerManagement() {
       setIsFormOpen(false)
       setEditing(null)
       resetForm()
-      afterMutation()
+      isEdit ? refreshKeepPage() : afterMutation()
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Lưu giảng viên thất bại')
     } finally {
@@ -275,7 +282,7 @@ export default function LecturerManagement() {
     try {
       await lectureService.lockAccount(lecturer.id, action)
       toast.success(`Đã ${actionLabel} tài khoản giảng viên`)
-      afterMutation()
+      refreshKeepPage()
     } catch (err) {
       toast.error(err?.response?.data?.message || `${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} tài khoản thất bại`)
     }
@@ -335,7 +342,7 @@ export default function LecturerManagement() {
           toast.dismiss(loadingToast)
           if (success > 0) toast.success(`Đã ${actionLabel} ${success} tài khoản giảng viên`)
           if (fail > 0) toast.error(`${fail} tài khoản ${actionLabel} thất bại`)
-          afterMutation()
+          refreshKeepPage()
         } catch (err) {
           toast.dismiss(loadingToast)
           toast.error(err?.response?.data?.message || `${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} toàn bộ thất bại`)

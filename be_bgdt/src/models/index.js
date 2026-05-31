@@ -46,6 +46,9 @@ Lecturer.belongsTo(Faculty, { foreignKey: 'faculty_id', as: 'faculty' });
 Faculty.hasMany(Course, { foreignKey: 'faculty_id', as: 'courses' });
 Course.belongsTo(Faculty, { foreignKey: 'faculty_id', as: 'faculty' });
 
+Major.hasMany(Course, { foreignKey: 'major_id', as: 'majorCourses' });
+Course.belongsTo(Major, { foreignKey: 'major_id', as: 'major' });
+
 Major.hasMany(Lecturer, { foreignKey: 'major_id', as: 'lecturers' });
 Lecturer.belongsTo(Major, { foreignKey: 'major_id', as: 'major' });
 
