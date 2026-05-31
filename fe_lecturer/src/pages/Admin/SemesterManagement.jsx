@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useUrlState } from '@/hooks'
 import { Edit, Plus, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import academicTermService from '@/services/academicTermService'
@@ -101,52 +102,51 @@ function TermDialog({ isOpen, onOpenChange, form, onFormChange, onSubmit, submit
 	)
 }
 
-//  Trang chính 
+const URL_DEFAULTS_SM = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0] }
+
+//  Trang chính
 export default function SemesterManagement() {
-	const [rows, setRows]           = useState([])
-	const [total, setTotal]         = useState(0)
-	const [loading, setLoading]     = useState(false)
-	const [page, setPage]           = useState(1)
-	const [pageSize, setPageSize]   = useState(PAGE_SIZE_OPTIONS[0])
+	const { get, set, resetPage, searchParams } = useUrlState(URL_DEFAULTS_SM)
+	const page     = Number(get('page'))     || 1
+	const pageSize = Number(get('pageSize')) || PAGE_SIZE_OPTIONS[0]
 
-	// filters
-	const [searchYear, setSearchYear]         = useState('')
-	const [searchSemester, setSearchSemester] = useState('')
-	const [searchActive, setSearchActive]     = useState('')
+	const [draftYear,     setDraftYear]     = useState(() => get('academicYear'))
+	const [draftSemester, setDraftSemester] = useState(() => get('semester'))
+	const [draftActive,   setDraftActive]   = useState(() => get('isActive'))
+	const [refreshKey, setRefreshKey]       = useState(0)
 
-	// dialog
-	const [dialogOpen, setDialogOpen]       = useState(false)
-	const [dialogForm, setDialogForm]       = useState(emptyForm)
+	const [rows, setRows]       = useState([])
+	const [total, setTotal]     = useState(0)
+	const [loading, setLoading] = useState(false)
+
+	const [dialogOpen, setDialogOpen]             = useState(false)
+	const [dialogForm, setDialogForm]             = useState(emptyForm)
 	const [dialogSubmitting, setDialogSubmitting] = useState(false)
-	const [editTarget, setEditTarget]       = useState(null) // null = thêm mới
+	const [editTarget, setEditTarget]             = useState(null)
 
 	const totalPages = Math.max(Math.ceil(total / pageSize), 1)
 
-	const fetchRows = async (p = page, ps = pageSize, year = searchYear, sem = searchSemester, active = searchActive) => {
+	useEffect(() => {
+		const year   = searchParams.get('academicYear') || ''
+		const sem    = searchParams.get('semester')     || ''
+		const active = searchParams.get('isActive')     || ''
 		setLoading(true)
-		try {
-			const { rows: data, total: count } = await academicTermService.list({
-				academicYear: year, semester: sem, isActive: active, page: p, pageSize: ps,
-			})
-			setRows(data)
-			setTotal(count)
-			setPage(p)
-			setPageSize(ps)
-		} catch (err) {
-			toast.error(err?.response?.data?.message || 'Không tải được danh sách học kỳ')
-		} finally {
-			setLoading(false)
-		}
-	}
+		academicTermService.list({ academicYear: year, semester: sem, isActive: active, page, pageSize })
+			.then(({ rows: data, total: count }) => { setRows(data); setTotal(count) })
+			.catch((err) => toast.error(err?.response?.data?.message || 'Không tải được danh sách học kỳ'))
+			.finally(() => setLoading(false))
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchParams, refreshKey])
 
-	useEffect(() => { fetchRows() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+	const afterMutation = useCallback(() => {
+		resetPage()
+		setRefreshKey((k) => k + 1)
+	}, [resetPage])
 
-	const refresh = () => fetchRows(page, pageSize, searchYear, searchSemester, searchActive)
-
-	const handleSearch = () => fetchRows(1, pageSize, searchYear, searchSemester, searchActive)
+	const handleSearch = () => resetPage({ academicYear: draftYear.trim(), semester: draftSemester, isActive: draftActive })
 	const handleReset  = () => {
-		setSearchYear(''); setSearchSemester(''); setSearchActive('')
-		fetchRows(1, pageSize, '', '', '')
+		setDraftYear(''); setDraftSemester(''); setDraftActive('')
+		resetPage({ academicYear: '', semester: '', isActive: '' })
 	}
 
 	//  Thêm mới 
@@ -184,7 +184,7 @@ export default function SemesterManagement() {
 				toast.success('Tạo học kỳ thành công')
 			}
 			setDialogOpen(false)
-			refresh()
+			afterMutation()
 		} catch (err) {
 			toast.error(err?.response?.data?.message || 'Lưu học kỳ thất bại')
 		} finally {
@@ -217,8 +217,8 @@ export default function SemesterManagement() {
 						<div className="space-y-1.5">
 							<label className="text-sm font-semibold text-slate-700">Năm học</label>
 							<Input
-								value={searchYear}
-								onChange={(e) => setSearchYear(e.target.value)}
+								value={draftYear}
+								onChange={(e) => setDraftYear(e.target.value)}
 								placeholder="VD: 2025-2026"
 								onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
 							/>
@@ -227,8 +227,8 @@ export default function SemesterManagement() {
 						<div className="space-y-1.5">
 							<label className="text-sm font-semibold text-slate-700">Học kỳ</label>
 							<select
-								value={searchSemester}
-								onChange={(e) => setSearchSemester(e.target.value)}
+								value={draftSemester}
+								onChange={(e) => setDraftSemester(e.target.value)}
 								className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#08387F]/30"
 							>
 								<option value="">Tất cả</option>
@@ -241,8 +241,8 @@ export default function SemesterManagement() {
 						<div className="space-y-1.5">
 							<label className="text-sm font-semibold text-slate-700">Trạng thái</label>
 							<select
-								value={searchActive}
-								onChange={(e) => setSearchActive(e.target.value)}
+								value={draftActive}
+								onChange={(e) => setDraftActive(e.target.value)}
 								className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#08387F]/30"
 							>
 								<option value="">Tất cả</option>
@@ -341,7 +341,7 @@ export default function SemesterManagement() {
 							<span>Hiển thị</span>
 							<select
 								value={pageSize}
-								onChange={(e) => fetchRows(1, Number(e.target.value), searchYear, searchSemester, searchActive)}
+								onChange={(e) => resetPage({ pageSize: Number(e.target.value) })}
 								className="rounded border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]"
 							>
 								{PAGE_SIZE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -354,7 +354,7 @@ export default function SemesterManagement() {
 								<PaginationItem>
 									<PaginationPrevious
 										href="#"
-										onClick={(e) => { e.preventDefault(); if (page > 1) fetchRows(page - 1, pageSize, searchYear, searchSemester, searchActive) }}
+										onClick={(e) => { e.preventDefault(); if (page > 1) set({ page: page - 1 }) }}
 										className={page <= 1 ? 'pointer-events-none opacity-40' : ''}
 									/>
 								</PaginationItem>
@@ -362,14 +362,14 @@ export default function SemesterManagement() {
 									<PaginationItem key={`${item}-${idx}`}>
 										{item === '...'
 											? <PaginationEllipsis />
-											: <PaginationLink href="#" isActive={item === page} onClick={(e) => { e.preventDefault(); fetchRows(item, pageSize, searchYear, searchSemester, searchActive) }}>{item}</PaginationLink>
+											: <PaginationLink href="#" isActive={item === page} onClick={(e) => { e.preventDefault(); set({ page: item }) }}>{item}</PaginationLink>
 										}
 									</PaginationItem>
 								))}
 								<PaginationItem>
 									<PaginationNext
 										href="#"
-										onClick={(e) => { e.preventDefault(); if (page < totalPages) fetchRows(page + 1, pageSize, searchYear, searchSemester, searchActive) }}
+										onClick={(e) => { e.preventDefault(); if (page < totalPages) set({ page: page + 1 }) }}
 										className={page >= totalPages ? 'pointer-events-none opacity-40' : ''}
 									/>
 								</PaginationItem>

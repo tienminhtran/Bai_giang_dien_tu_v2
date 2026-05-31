@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import * as XLSX from 'xlsx'
-import { Download, Edit, FileSpreadsheet, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { BadgeInfo, Download, Edit, FileSpreadsheet, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import courseService from '@/services/courseService'
 import facultyService from '@/services/facultyService'
@@ -13,6 +13,7 @@ import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, Pagi
 import { Separator } from '@/components/ui/separator'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { downloadCourseExcelTemplate } from '@/components/template_excel/courseTemplate'
+import { useUrlState } from '@/hooks'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50]
 
@@ -216,18 +217,29 @@ function ImportCourseDialog({ isOpen, onOpenChange, importFile, onFileChange, im
 	)
 }
 
-//  Main page 
+//  Main page
+const URL_DEFAULTS = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0] }
+
 export default function CourseManagement() {
+	//  URL state (page, pageSize, filter đã apply) 
+	const { get, set, resetPage, searchParams } = useUrlState(URL_DEFAULTS)
+	const page     = Number(get('page'))     || 1
+	const pageSize = Number(get('pageSize')) || PAGE_SIZE_OPTIONS[0]
+
+	//  Draft filter (người dùng đang gõ, chưa apply) 
+	const [draftCode, setDraftCode] = useState(() => get('courseCode'))
+	const [draftName, setDraftName] = useState(() => get('courseName'))
+
+	// refreshKey: tăng sau mỗi mutation để force re-fetch khi page đã là 1
+	const [refreshKey, setRefreshKey] = useState(0)
+
+	//  Data state 
 	const [rows, setRows] = useState([])
 	const [total, setTotal] = useState(0)
 	const [loading, setLoading] = useState(false)
-	const [page, setPage] = useState(1)
-	const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
-	const [searchCode, setSearchCode] = useState('')
-	const [searchName, setSearchName] = useState('')
-
 	const [faculties, setFaculties] = useState([])
 
+	//  Dialog state 
 	const [addOpen, setAddOpen] = useState(false)
 	const [addSubmitting, setAddSubmitting] = useState(false)
 	const [addForm, setAddForm] = useState(emptyForm)
@@ -243,31 +255,40 @@ export default function CourseManagement() {
 	const [importResult, setImportResult] = useState(null)
 	const [importedRows, setImportedRows] = useState([])
 
+	const [countManagerOpen, setCountManagerOpen] = useState(false)
+	const [countManagerCourse, setCountManagerCourse] = useState(null)
+	const [countManagerValue, setCountManagerValue] = useState(1)
+	const [countManagerSubmitting, setCountManagerSubmitting] = useState(false)
+
 	const totalPages = Math.max(Math.ceil(total / pageSize), 1)
 
+	//  Load faculties 1 lần 
 	useEffect(() => {
 		facultyService.list().then(setFaculties).catch(() => {})
-		fetchRows()
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
-	const fetchRows = async (nextPage = page, nextPageSize = pageSize, courseCode = searchCode, courseName = searchName) => {
+	//  Fetch courses — chạy mỗi khi URL hoặc refreshKey đổi 
+	useEffect(() => {
+		const courseCode = searchParams.get('courseCode') || ''
+		const courseName = searchParams.get('courseName') || ''
 		setLoading(true)
-		try {
-			const { rows: data, total: count } = await courseService.list({ courseCode, courseName, page: nextPage, pageSize: nextPageSize })
-			setRows(data)
-			setTotal(count)
-			setPage(nextPage)
-			setPageSize(nextPageSize)
-		} catch (err) {
-			toast.error(err?.response?.data?.message || 'Không tải được danh sách môn học')
-		} finally {
-			setLoading(false)
-		}
-	}
+		courseService.list({ courseCode, courseName, page, pageSize })
+			.then(({ rows: data, total: count }) => { setRows(data); setTotal(count) })
+			.catch((err) => toast.error(err?.response?.data?.message || 'Không tải được danh sách môn học'))
+			.finally(() => setLoading(false))
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchParams, refreshKey])
 
-	const refreshRows = () => fetchRows(page, pageSize, searchCode, searchName)
+	// Sau mutation: về trang 1; nếu đã ở trang 1 thì dùng refreshKey để trigger lại
+	const afterMutation = useCallback(() => {
+		resetPage()
+		setRefreshKey((k) => k + 1)
+	}, [resetPage])
 
+	//  Search 
+	const applySearch = () => resetPage({ courseCode: draftCode.trim(), courseName: draftName.trim() })
+
+	//  Add 
 	const handleAddCourse = async () => {
 		if (!addForm.courseCode.trim() || !addForm.courseName.trim()) {
 			toast.error('Vui lòng nhập mã môn học và tên môn học')
@@ -279,7 +300,7 @@ export default function CourseManagement() {
 			toast.success('Tạo môn học thành công')
 			setAddOpen(false)
 			setAddForm(emptyForm)
-			refreshRows()
+			afterMutation()
 		} catch (err) {
 			toast.error(err?.response?.data?.message || 'Tạo môn học thất bại')
 		} finally {
@@ -287,6 +308,7 @@ export default function CourseManagement() {
 		}
 	}
 
+	//  Edit 
 	const openEdit = (course) => {
 		setEditId(course.id)
 		setEditForm({
@@ -310,7 +332,7 @@ export default function CourseManagement() {
 			await courseService.update(editId, editForm)
 			toast.success('Cập nhật môn học thành công')
 			setEditOpen(false)
-			refreshRows()
+			afterMutation()
 		} catch (err) {
 			toast.error(err?.response?.data?.message || 'Cập nhật môn học thất bại')
 		} finally {
@@ -318,7 +340,41 @@ export default function CourseManagement() {
 		}
 	}
 
-	//  Import: xử lý multi-sheet (mỗi sheet = 1 khoa) 
+	//  Delete 
+	const handleDelete = (course) => {
+		if (!window.confirm(`Bạn có chắc muốn xóa môn học "${course.courseName}"?`)) return
+		courseService.delete(course.id)
+			.then(() => { toast.success('Xóa môn học thành công'); afterMutation() })
+			.catch((err) => toast.error(err?.response?.data?.message || 'Xóa môn học thất bại'))
+	}
+
+	//  Count Manager 
+	const openCountManagerEdit = (course) => {
+		setCountManagerCourse(course)
+		setCountManagerValue(course.countManager ?? 1)
+		setCountManagerOpen(true)
+	}
+
+	const handleUpdateCountManager = async () => {
+		const val = Number(countManagerValue)
+		if (!Number.isInteger(val) || val < 1) {
+			toast.error('Giá trị phải là số nguyên >= 1')
+			return
+		}
+		try {
+			setCountManagerSubmitting(true)
+			await courseService.updateCountManager(countManagerCourse.id, val)
+			toast.success('Cập nhật giới hạn manager thành công')
+			setCountManagerOpen(false)
+			afterMutation()
+		} catch (err) {
+			toast.error(err?.response?.data?.message || 'Cập nhật thất bại')
+		} finally {
+			setCountManagerSubmitting(false)
+		}
+	}
+
+	//  Import 
 	const handleImport = async () => {
 		if (!importFile) {
 			toast.error('Vui lòng chọn file Excel trước khi nhập')
@@ -331,7 +387,6 @@ export default function CourseManagement() {
 			const data = await importFile.arrayBuffer()
 			const wb = XLSX.read(data, { type: 'array' })
 
-			// Map tên khoa (lowercase) → id
 			const facultyMap = {}
 			faculties.forEach((f) => { facultyMap[f.facultyName.trim().toLowerCase()] = f.id })
 
@@ -344,9 +399,7 @@ export default function CourseManagement() {
 					sheetErrors.push({ row: '—', course_code: '—', sheet: sheetName, type: 'Không tìm thấy khoa', message: `Sheet "${sheetName}" không khớp với tên khoa nào trong hệ thống` })
 					continue
 				}
-
-				const ws = wb.Sheets[sheetName]
-				const sheetRows = XLSX.utils.sheet_to_json(ws, { defval: '' })
+				const sheetRows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' })
 				for (const row of sheetRows) {
 					allCourses.push({
 						courseCode: String(row['Mã môn học'] ?? '').trim(),
@@ -368,7 +421,6 @@ export default function CourseManagement() {
 			setImportedRows(allCourses)
 			const result = await courseService.importCourses(allCourses)
 
-			// gắn thêm sheet vào từng lỗi để hiển thị
 			const enrichedErrors = [
 				...sheetErrors,
 				...result.errors.map((e) => ({ ...e, sheet: allCourses[e.row - 1]?._sheet || '—' })),
@@ -381,7 +433,7 @@ export default function CourseManagement() {
 			}
 			setImportResult(finalResult)
 
-			if (result.successCount > 0) refreshRows()
+			if (result.successCount > 0) afterMutation()
 			if (finalResult.errorCount === 0) {
 				toast.success(`Đã nhập ${result.successCount} môn học thành công`)
 				setImportOpen(false)
@@ -403,7 +455,7 @@ export default function CourseManagement() {
 
 	const downloadErrors = () => {
 		if (!importResult?.errors?.length) return
-		const rowsForExport = importResult.errors.map((err, i) => {
+		const rowsForExport = importResult.errors.map((err) => {
 			const orig = importedRows[err.row - 1] || {}
 			return {
 				'Dòng': err.row,
@@ -422,6 +474,7 @@ export default function CourseManagement() {
 		XLSX.writeFile(wbOut, 'loi_import_mon_hoc.xlsx')
 	}
 
+	//  Pagination helpers 
 	const pageNumbers = (() => {
 		if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
 		const pages = [1]
@@ -443,14 +496,14 @@ export default function CourseManagement() {
 					<div className="grid gap-4 xl:grid-cols-[1.2fr_1.2fr_auto]">
 						<div className="space-y-2">
 							<label className="text-sm font-semibold text-slate-700">Mã môn học</label>
-							<Input value={searchCode} onChange={(e) => setSearchCode(e.target.value)} placeholder="Nhập mã môn học" onKeyDown={(e) => e.key === 'Enter' && fetchRows(1, pageSize, e.currentTarget.value, searchName)} />
+							<Input value={draftCode} onChange={(e) => setDraftCode(e.target.value)} placeholder="Nhập mã môn học" onKeyDown={(e) => e.key === 'Enter' && applySearch()} />
 						</div>
 						<div className="space-y-2">
 							<label className="text-sm font-semibold text-slate-700">Tên môn học</label>
-							<Input value={searchName} onChange={(e) => setSearchName(e.target.value)} placeholder="Nhập tên môn học" onKeyDown={(e) => e.key === 'Enter' && fetchRows(1, pageSize, searchCode, e.currentTarget.value)} />
+							<Input value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder="Nhập tên môn học" onKeyDown={(e) => e.key === 'Enter' && applySearch()} />
 						</div>
 						<div className="flex items-end">
-							<Button type="button" className="w-full bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={() => fetchRows(1, pageSize)}>
+							<Button type="button" className="w-full bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={applySearch}>
 								<Search className="mr-2 h-4 w-4" /> Tìm
 							</Button>
 						</div>
@@ -470,11 +523,9 @@ export default function CourseManagement() {
 
 					<Separator />
 
-					<div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-						<Badge variant="secondary" className="rounded-none bg-slate-100 text-slate-700 hover:bg-slate-100">
-							Tổng: {total}
-						</Badge>
-					</div>
+					<Badge variant="secondary" className="rounded-none bg-slate-100 text-slate-700 hover:bg-slate-100">
+						Tổng: {total}
+					</Badge>
 				</CardContent>
 			</Card>
 
@@ -492,27 +543,32 @@ export default function CourseManagement() {
 									<TableHead>Tên môn học</TableHead>
 									<TableHead className="w-[100px]">Số tín chỉ</TableHead>
 									<TableHead className="w-[180px]">Khoa chủ quản</TableHead>
-									<TableHead>Mô tả</TableHead>
+									{/* <TableHead>Mô tả</TableHead> */}
+									<TableHead className="w-[120px]">Manager tối đa</TableHead>
 									<TableHead className="w-[140px]">Trạng thái</TableHead>
 									<TableHead className="w-[80px]"></TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{loading ? (
-									<TableRow>
-										<TableCell colSpan={7} className="py-8 text-center text-slate-400">Đang tải...</TableCell>
-									</TableRow>
+									<TableRow><TableCell colSpan={7} className="py-8 text-center text-slate-400">Đang tải...</TableCell></TableRow>
 								) : rows.length === 0 ? (
-									<TableRow>
-										<TableCell colSpan={7} className="py-8 text-center text-slate-500">Không tìm thấy môn học phù hợp.</TableCell>
-									</TableRow>
+									<TableRow><TableCell colSpan={7} className="py-8 text-center text-slate-500">Không tìm thấy môn học phù hợp.</TableCell></TableRow>
 								) : rows.map((course) => (
 									<TableRow key={course.id}>
 										<TableCell className="font-medium text-slate-900">{course.courseCode}</TableCell>
 										<TableCell>{course.courseName}</TableCell>
 										<TableCell>{course.credits || '—'}</TableCell>
 										<TableCell className="max-w-[180px] truncate text-slate-600">{course.facultyName || '—'}</TableCell>
-										<TableCell className="max-w-[300px] truncate">{course.description || '—'}</TableCell>
+										{/* <TableCell className="max-w-[300px] truncate">{course.description || '—'}</TableCell> */}
+										<TableCell>
+											<div className="flex items-center gap-1">
+												<span className="font-mono text-sm font-semibold text-slate-700">Số GV: {course.countManager}</span>
+												<Button type="button" variant="ghost" size="icon-sm" title="Cập nhật giới hạn manager" onClick={() => openCountManagerEdit(course)}>
+													<BadgeInfo className="h-5 w-5 text-blue-600 hover:text-[#08387F]" />
+												</Button>
+											</div>
+										</TableCell>
 										<TableCell>
 											<Badge className={course.isActive
 												? 'rounded-none bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
@@ -524,17 +580,7 @@ export default function CourseManagement() {
 											<Button type="button" variant="ghost" size="icon-sm" title="Sửa thông tin" onClick={() => openEdit(course)}>
 												<Edit className="h-4 w-4 text-blue-500" />
 											</Button>
-											{/* xóa */}
-											<Button type="button" variant="ghost" size="icon-sm" title="Xóa môn học" onClick={() => {
-												if (window.confirm(`Bạn có chắc muốn xóa môn học "${course.courseName}"?`)) {
-													courseService.delete(course.id).then(() => {
-														toast.success('Xóa môn học thành công')
-														refreshRows()
-													}).catch((err) => {
-														toast.error(err?.response?.data?.message || 'Xóa môn học thất bại')
-													})
-												}
-											}}>
+											<Button type="button" variant="ghost" size="icon-sm" title="Xóa môn học" onClick={() => handleDelete(course)}>
 												<Trash2 className="h-4 w-4 text-red-500" />
 											</Button>
 										</TableCell>
@@ -549,7 +595,7 @@ export default function CourseManagement() {
 							<span>Hiển thị</span>
 							<select
 								value={pageSize}
-								onChange={(e) => fetchRows(1, Number(e.target.value), searchCode, searchName)}
+								onChange={(e) => resetPage({ pageSize: Number(e.target.value) })}
 								className="rounded border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]"
 							>
 								{PAGE_SIZE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -560,17 +606,17 @@ export default function CourseManagement() {
 						<Pagination className="w-auto justify-end">
 							<PaginationContent>
 								<PaginationItem>
-									<PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); if (page > 1) fetchRows(page - 1, pageSize, searchCode, searchName) }} className={page <= 1 ? 'pointer-events-none opacity-40' : ''} />
+									<PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); if (page > 1) set({ page: page - 1 }) }} className={page <= 1 ? 'pointer-events-none opacity-40' : ''} />
 								</PaginationItem>
 								{pageNumbers.map((item, index) => (
 									<PaginationItem key={`${item}-${index}`}>
 										{item === '...'
 											? <PaginationEllipsis />
-											: <PaginationLink href="#" isActive={item === page} onClick={(e) => { e.preventDefault(); fetchRows(item, pageSize, searchCode, searchName) }}>{item}</PaginationLink>}
+											: <PaginationLink href="#" isActive={item === page} onClick={(e) => { e.preventDefault(); set({ page: item }) }}>{item}</PaginationLink>}
 									</PaginationItem>
 								))}
 								<PaginationItem>
-									<PaginationNext href="#" onClick={(e) => { e.preventDefault(); if (page < totalPages) fetchRows(page + 1, pageSize, searchCode, searchName) }} className={page >= totalPages ? 'pointer-events-none opacity-40' : ''} />
+									<PaginationNext href="#" onClick={(e) => { e.preventDefault(); if (page < totalPages) set({ page: page + 1 }) }} className={page >= totalPages ? 'pointer-events-none opacity-40' : ''} />
 								</PaginationItem>
 							</PaginationContent>
 						</Pagination>
@@ -614,6 +660,35 @@ export default function CourseManagement() {
 				faculties={faculties}
 				onDownloadTemplate={() => downloadCourseExcelTemplate(faculties)}
 			/>
+
+			{/* Dialog cập nhật giới hạn manager */}
+			<Dialog open={countManagerOpen} onOpenChange={(open) => { setCountManagerOpen(open); if (!open) setCountManagerCourse(null) }}>
+				<DialogContent className="sm:max-w-xs">
+					<DialogHeader>
+						<DialogTitle>Giới hạn Manager</DialogTitle>
+						<DialogDescription>
+							{countManagerCourse?.courseName} ({countManagerCourse?.courseCode})
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-2 py-2">
+						<label className="text-sm font-semibold">Số manager tối đa</label>
+						<Input
+							type="number"
+							min={1}
+							value={countManagerValue}
+							onChange={(e) => setCountManagerValue(Number(e.target.value))}
+							onKeyDown={(e) => e.key === 'Enter' && handleUpdateCountManager()}
+						/>
+						<p className="text-xs text-slate-500">Tối thiểu 1. Hệ thống sẽ từ chối phân công manager thứ {countManagerValue + 1} trở lên.</p>
+					</div>
+					<DialogFooter>
+						<Button type="button" variant="outline" onClick={() => setCountManagerOpen(false)}>Hủy</Button>
+						<Button type="button" className="bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={handleUpdateCountManager} disabled={countManagerSubmitting}>
+							{countManagerSubmitting ? 'Đang lưu...' : 'Lưu'}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	)
 }

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useUrlState } from '@/hooks'
 import * as XLSX from 'xlsx'
 import { Download, Edit, Search, Settings, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
@@ -15,21 +16,25 @@ import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, Pagi
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50]
 
+const URL_DEFAULTS_LRM = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0] }
+
 export default function LecturerRoleManagement() {
-	const [rows, setRows]               = useState([])
-	const [total, setTotal]             = useState(0)
-	const [loading, setLoading]         = useState(false)
-	const [rolesLoading, setRolesLoading] = useState(false)
-	const [page, setPage]               = useState(1)
-	const [pageSize, setPageSize]       = useState(PAGE_SIZE_OPTIONS[0])
-	const [searchCode, setSearchCode]   = useState('')
-	const [searchName, setSearchName]   = useState('')
-	const [allRoles, setAllRoles]       = useState([])
-	const [editOpen, setEditOpen]       = useState(false)
-	const [editSubmitting, setEditSubmitting] = useState(false)
+	const { get, set, resetPage, searchParams } = useUrlState(URL_DEFAULTS_LRM)
+	const page     = Number(get('page'))     || 1
+	const pageSize = Number(get('pageSize')) || PAGE_SIZE_OPTIONS[0]
+	const [draftCode, setDraftCode] = useState(() => get('lecturerCode'))
+	const [draftName, setDraftName] = useState(() => get('fullName'))
+	const [refreshKey, setRefreshKey] = useState(0)
+
+	const [rows, setRows]                         = useState([])
+	const [total, setTotal]                       = useState(0)
+	const [loading, setLoading]                   = useState(false)
+	const [rolesLoading, setRolesLoading]         = useState(false)
+	const [allRoles, setAllRoles]                 = useState([])
+	const [editOpen, setEditOpen]                 = useState(false)
+	const [editSubmitting, setEditSubmitting]     = useState(false)
 	const [selectedLecturer, setSelectedLecturer] = useState(null)
 	const [selectedRoleIds, setSelectedRoleIds]   = useState([])
-	const lastQueryRef = useRef({ page: 1, pageSize: PAGE_SIZE_OPTIONS[0], lecturerCode: '', fullName: '' })
 
 	const selectedRoleIdSet = useMemo(() => new Set(selectedRoleIds), [selectedRoleIds])
 	const totalPages        = Math.max(Math.ceil(total / pageSize), 1)
@@ -45,39 +50,29 @@ export default function LecturerRoleManagement() {
 		return pages
 	}
 
-	const fetchRoles = async () => {
+	useEffect(() => {
 		setRolesLoading(true)
-		try {
-			const roles = await userRoleService.listAllRoles()
-			setAllRoles(roles)
-		} catch (err) {
-			toast.error(err?.response?.data?.message || 'Không tải được danh sách quyền')
-		} finally {
-			setRolesLoading(false)
-		}
-	}
-
-	const fetchRows = async (nextPage = page, nextPageSize = pageSize, lecturerCode = searchCode, fullName = searchName) => {
-		setLoading(true)
-		try {
-			lastQueryRef.current = { page: nextPage, pageSize: nextPageSize, lecturerCode, fullName }
-			const { rows: data, total: count } = await userRoleService.listLecturerRoles({ lecturerCode, fullName, page: nextPage, pageSize: nextPageSize })
-			setRows(data)
-			setTotal(count)
-			setPage(nextPage)
-			setPageSize(nextPageSize)
-		} catch (err) {
-			toast.error(err?.response?.data?.message || 'Không tải được danh sách phân quyền')
-		} finally {
-			setLoading(false)
-		}
-	}
+		userRoleService.listAllRoles()
+			.then(setAllRoles)
+			.catch((err) => toast.error(err?.response?.data?.message || 'Không tải được danh sách quyền'))
+			.finally(() => setRolesLoading(false))
+	}, [])
 
 	useEffect(() => {
-		fetchRoles()
-		fetchRows()
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [])
+		const code = searchParams.get('lecturerCode') || ''
+		const name = searchParams.get('fullName') || ''
+		setLoading(true)
+		userRoleService.listLecturerRoles({ lecturerCode: code, fullName: name, page, pageSize })
+			.then(({ rows: data, total: count }) => { setRows(data); setTotal(count) })
+			.catch((err) => toast.error(err?.response?.data?.message || 'Không tải được danh sách phân quyền'))
+			.finally(() => setLoading(false))
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchParams, refreshKey])
+
+	const afterMutation = useCallback(() => {
+		resetPage()
+		setRefreshKey((k) => k + 1)
+	}, [resetPage])
 
 	const openEdit = (lecturer) => {
 		setSelectedLecturer(lecturer)
@@ -93,8 +88,7 @@ export default function LecturerRoleManagement() {
 			toast.success('Cập nhật quyền giảng viên thành công')
 			setEditOpen(false)
 			setSelectedLecturer(null)
-			const q = lastQueryRef.current
-			await fetchRows(q.page, q.pageSize, q.lecturerCode, q.fullName)
+			afterMutation()
 		} catch (err) {
 			toast.error(err?.response?.data?.message || 'Cập nhật quyền giảng viên thất bại')
 		} finally {
@@ -105,8 +99,10 @@ export default function LecturerRoleManagement() {
 	const handleExportExcel = async () => {
 		try {
 			const loadingToast = toast.loading('Đang tải dữ liệu để xuất Excel...')
-			const { total: count } = await userRoleService.listLecturerRoles({ lecturerCode: searchCode, fullName: searchName, page: 1, pageSize: 1 })
-			const { rows: data }   = await userRoleService.listLecturerRoles({ lecturerCode: searchCode, fullName: searchName, page: 1, pageSize: Math.max(count, 1) })
+			const appliedCode = searchParams.get('lecturerCode') || ''
+			const appliedName = searchParams.get('fullName') || ''
+			const { total: count } = await userRoleService.listLecturerRoles({ lecturerCode: appliedCode, fullName: appliedName, page: 1, pageSize: 1 })
+			const { rows: data }   = await userRoleService.listLecturerRoles({ lecturerCode: appliedCode, fullName: appliedName, page: 1, pageSize: Math.max(count, 1) })
 			const exportRows = data.map((item, idx) => ({
 				STT: idx + 1,
 				'Mã giảng viên': item.lecturerCode,
@@ -140,23 +136,23 @@ export default function LecturerRoleManagement() {
 						<div className="space-y-2">
 							<label className="text-sm font-semibold text-slate-700">Mã giảng viên</label>
 							<Input
-								value={searchCode}
-								onChange={(e) => setSearchCode(e.target.value)}
-								onKeyDown={(e) => e.key === 'Enter' && fetchRows(1, pageSize, searchCode, searchName)}
+								value={draftCode}
+								onChange={(e) => setDraftCode(e.target.value)}
+								onKeyDown={(e) => e.key === 'Enter' && resetPage({ lecturerCode: draftCode.trim(), fullName: draftName.trim() })}
 								placeholder="Nhập mã giảng viên"
 							/>
 						</div>
 						<div className="space-y-2">
 							<label className="text-sm font-semibold text-slate-700">Họ tên</label>
 							<Input
-								value={searchName}
-								onChange={(e) => setSearchName(e.target.value)}
-								onKeyDown={(e) => e.key === 'Enter' && fetchRows(1, pageSize, searchCode, searchName)}
+								value={draftName}
+								onChange={(e) => setDraftName(e.target.value)}
+								onKeyDown={(e) => e.key === 'Enter' && resetPage({ lecturerCode: draftCode.trim(), fullName: draftName.trim() })}
 								placeholder="Nhập họ tên"
 							/>
 						</div>
 						<div className="flex items-end">
-							<Button type="button" className="w-full bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={() => fetchRows(1, pageSize)}>
+							<Button type="button" className="w-full bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={() => resetPage({ lecturerCode: draftCode.trim(), fullName: draftName.trim() })}>
 								<Search className="mr-2 h-4 w-4" /> Tìm
 							</Button>
 						</div>
@@ -247,7 +243,7 @@ export default function LecturerRoleManagement() {
 							<span>Hiển thị</span>
 							<select
 								value={pageSize}
-								onChange={(e) => fetchRows(1, Number(e.target.value), searchCode, searchName)}
+								onChange={(e) => resetPage({ pageSize: Number(e.target.value) })}
 								className="rounded border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]"
 							>
 								{PAGE_SIZE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -260,7 +256,7 @@ export default function LecturerRoleManagement() {
 								<PaginationItem>
 									<PaginationPrevious
 										href="#"
-										onClick={(e) => { e.preventDefault(); if (safePage > 1) fetchRows(safePage - 1, pageSize, searchCode, searchName) }}
+										onClick={(e) => { e.preventDefault(); if (safePage > 1) set({ page: safePage - 1 }) }}
 										className={safePage === 1 ? 'pointer-events-none opacity-40' : ''}
 									/>
 								</PaginationItem>
@@ -273,7 +269,7 @@ export default function LecturerRoleManagement() {
 											<PaginationLink
 												href="#"
 												isActive={p === safePage}
-												onClick={(e) => { e.preventDefault(); fetchRows(p, pageSize, searchCode, searchName) }}
+												onClick={(e) => { e.preventDefault(); set({ page: p }) }}
 											>
 												{p}
 											</PaginationLink>
@@ -284,7 +280,7 @@ export default function LecturerRoleManagement() {
 								<PaginationItem>
 									<PaginationNext
 										href="#"
-										onClick={(e) => { e.preventDefault(); if (safePage < totalPages) fetchRows(safePage + 1, pageSize, searchCode, searchName) }}
+										onClick={(e) => { e.preventDefault(); if (safePage < totalPages) set({ page: safePage + 1 }) }}
 										className={safePage === totalPages ? 'pointer-events-none opacity-40' : ''}
 									/>
 								</PaginationItem>

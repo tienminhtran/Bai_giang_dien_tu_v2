@@ -10,6 +10,7 @@ const toFrontend = (course) => ({
 	facultyId: course.faculty_id || '',
 	facultyName: course.faculty?.faculty_name || '',
 	isActive: Boolean(course.is_active),
+	countManager: course.count_manager ?? 1,
 })
 
 const list = async ({ courseCode = '', courseName = '', page = 1, pageSize = 10 } = {}) => {
@@ -66,4 +67,31 @@ const remove = async (id) => {
 	return res.data
 }
 
-export default { list, create, update, delete: remove, importCourses }
+const listMyFaculty = async ({ courseCode = '', courseName = '', page = 1, pageSize = 10 } = {}) => {
+	const params = { page, pageSize }
+	if (courseCode) params.course_code = courseCode
+	if (courseName) params.course_name = courseName
+	const res = await api.get(COURSE_EP.MY_FACULTY, { params })
+	const { faculty, rows, total } = res.data.data
+	return {
+		faculty: faculty ? { id: faculty.id, facultyName: faculty.faculty_name } : null,
+		rows: rows.map(toFrontend),
+		total,
+	}
+}
+
+const listByFaculty = async (facultyId, { courseCode = '', courseName = '', page = 1, pageSize = 20 } = {}) => {
+	const params = { page, pageSize }
+	if (courseCode) params.course_code = courseCode
+	if (courseName) params.course_name = courseName
+	const res = await api.get(COURSE_EP.LIST_BY_FACULTY(facultyId), { params })
+	const { faculty, rows, total } = res.data.data
+	return { faculty, rows: rows.map(toFrontend), total }
+}
+
+const updateCountManager = async (id, countManager) => {
+	const res = await api.patch(COURSE_EP.UPDATE_COUNT_MANAGER(id), { count_manager: countManager })
+	return res.data
+}
+
+export default { list, create, update, delete: remove, importCourses, listMyFaculty, listByFaculty, updateCountManager }

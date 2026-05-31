@@ -26,6 +26,7 @@ import DepartmentHeadDashboardPage       from './DepartmentHead/Dashboard'
 import DepartmentHeadLecturerManagement from './DepartmentHead/LecturerManagement'
 import DepartmentHeadMajorManagement    from './DepartmentHead/MajorManagement'
 import MajorManagementDetail            from './DepartmentHead/MajorManagementDetail'
+import DepartmentHeadCourseManagement   from './DepartmentHead/CourseManagement'
 import AdminMajorManagement             from './Admin/MajorManagement'
 import MajorHeadDashboardPage        from './MajorHead/Dashboard'
 
@@ -131,8 +132,8 @@ const MENU_CONFIG = {
         items: [
           { label: 'Tổng quan',              icon: LayoutDashboard, path: '/dashboard/department-head' },
           { label: 'Quản lý Giảng viên Khoa', icon: Users,         path: '/dashboard/department-head/lecturers' },
-          { label: 'Quản lý chuyên ngành',    icon: BookMarked,    path: '/dashboard/department-head/majors' },
-          { label: 'Môn học',                 icon: BookOpen,      path: '/dashboard/department-head/courses' },
+          { label: 'Quản lý Chuyên ngành',    icon: BookMarked,    path: '/dashboard/department-head/majors' },
+          { label: 'Quản lý Môn học',         icon: BookOpen,      path: '/dashboard/department-head/courses' },
         ],
       },
     ],
@@ -228,7 +229,7 @@ export default function Dashboard() {
             <Route path="lecturers"              element={<DepartmentHeadLecturerManagement />} />
             <Route path="majors"                 element={<DepartmentHeadMajorManagement />} />
             <Route path="majors/:majorId"        element={<MajorManagementDetail />} />
-            <Route path="courses"   element={<div className="py-10 text-center text-slate-500">Môn học — đang phát triển</div>} />
+            <Route path="courses"   element={<DepartmentHeadCourseManagement />} />
             <Route path="*" element={<Navigate to="/dashboard/department-head" replace />} />
           </>
         )}

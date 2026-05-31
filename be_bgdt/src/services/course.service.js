@@ -149,4 +149,41 @@ const deleteCourse = async (id) => {
     await course.destroy();
 };
 
-module.exports = { listCourses, createCourse, updateCourse, deleteCourse, importCourses };
+const updateCountManager = async (id, count_manager) => {
+    const course = await Course.findByPk(id);
+    if (!course) throw ApiError.notFound('Không tìm thấy môn học');
+
+    const val = Number(count_manager);
+    if (!Number.isInteger(val) || val < 1)
+        throw ApiError.badRequest('count_manager phải là số nguyên >= 1');
+
+    await course.update({ count_manager: val });
+    return Course.findByPk(id, {
+        include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+    });
+};
+
+const listCoursesByFaculty = async (facultyId, { course_code, course_name, page = 1, pageSize = 20 }) => {
+    const faculty = await Faculty.findByPk(facultyId, { attributes: ['id', 'faculty_name'] });
+    if (!faculty) throw ApiError.notFound('Không tìm thấy khoa');
+
+    const where = { faculty_id: facultyId };
+    if (course_code) where.course_code = { [Op.like]: `%${course_code}%` };
+    if (course_name) where.course_name = { [Op.like]: `%${course_name}%` };
+
+    const limit  = Number(pageSize) || 20;
+    const offset = (Math.max(Number(page) || 1, 1) - 1) * limit;
+
+    const [total, rows] = await Promise.all([
+        Course.count({ where }),
+        Course.findAll({
+            where, limit, offset,
+            order: [['course_name', 'ASC']],
+            include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'] }],
+        }),
+    ]);
+
+    return { faculty, total, rows };
+};
+
+module.exports = { listCourses, createCourse, updateCourse, deleteCourse, importCourses, listCoursesByFaculty, updateCountManager };

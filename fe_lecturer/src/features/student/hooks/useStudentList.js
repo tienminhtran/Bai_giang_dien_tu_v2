@@ -1,47 +1,47 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import studentService from '@/services/studentService'
+import { useUrlState } from '@/hooks'
 
 export const PAGE_SIZE_OPTIONS = [10, 20, 50]
 const normalize = (v) => String(v || '').trim().toLowerCase()
+const URL_DEFAULTS = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0] }
 
 export function useStudentList() {
-	const [students, setStudents]       = useState([])
-	const [total, setTotal]             = useState(0)
-	const [loading, setLoading]         = useState(false)
-	const [keywordCode, setKeywordCode] = useState('')
-	const [keywordName, setKeywordName] = useState('')
-	const [sortConfig, setSortConfig]   = useState({ key: null, direction: 'asc' })
-	const [currentPage, setCurrentPage] = useState(1)
-	const [pageSize, setPageSize]       = useState(PAGE_SIZE_OPTIONS[0])
+	const { get, set, resetPage, searchParams } = useUrlState(URL_DEFAULTS)
+	const page     = Number(get('page'))     || 1
+	const pageSize = Number(get('pageSize')) || PAGE_SIZE_OPTIONS[0]
 
-	const fetchStudents = useCallback(async (page, size, code, name) => {
-		setLoading(true)
-		try {
-			const { rows, total: t } = await studentService.list({ studentCode: code, fullName: name, page, pageSize: size })
-			setStudents(rows)
-			setTotal(t)
-		} catch (err) {
-			toast.error(err?.response?.data?.message || 'Không tải được danh sách sinh viên')
-		} finally {
-			setLoading(false)
-		}
-	}, [])
+	// draft: giá trị người dùng đang gõ, chưa apply
+	const [keywordCode, setKeywordCode] = useState(() => get('studentCode'))
+	const [keywordName, setKeywordName] = useState(() => get('fullName'))
+	const [refreshKey, setRefreshKey]   = useState(0)
 
+	const [students, setStudents]     = useState([])
+	const [total, setTotal]           = useState(0)
+	const [loading, setLoading]       = useState(false)
+	const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
+
+	// fetch mỗi khi URL hoặc refreshKey thay đổi
 	useEffect(() => {
-		fetchStudents(currentPage, pageSize, keywordCode, keywordName)
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [currentPage, pageSize])
+		const code = searchParams.get('studentCode') || ''
+		const name = searchParams.get('fullName')    || ''
+		setLoading(true)
+		studentService.list({ studentCode: code, fullName: name, page, pageSize })
+			.then(({ rows, total: t }) => { setStudents(rows); setTotal(t) })
+			.catch((err) => toast.error(err?.response?.data?.message || 'Không tải được danh sách sinh viên'))
+			.finally(() => setLoading(false))
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchParams, refreshKey])
 
-	const handleSearch = () => {
-		setCurrentPage(1)
-		fetchStudents(1, pageSize, keywordCode, keywordName)
-	}
+	// sau mutation: về trang 1, force re-fetch dù đang ở trang 1
+	const afterMutation = useCallback(() => {
+		resetPage()
+		setRefreshKey((k) => k + 1)
+	}, [resetPage])
 
-	const refresh = () => {
-		setCurrentPage(1)
-		fetchStudents(1, pageSize, keywordCode, keywordName)
-	}
+	const handleSearch = () =>
+		resetPage({ studentCode: keywordCode.trim(), fullName: keywordName.trim() })
 
 	const handleSort = (key) =>
 		setSortConfig((prev) => ({
@@ -60,7 +60,7 @@ export function useStudentList() {
 	}, [students, sortConfig])
 
 	const totalPages = Math.max(1, Math.ceil(total / pageSize))
-	const safePage   = Math.min(currentPage, totalPages)
+	const safePage   = Math.min(page, totalPages)
 
 	const getPageNumbers = () => {
 		if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -76,10 +76,16 @@ export function useStudentList() {
 		students: sortedStudents, total, loading,
 		keywordCode, setKeywordCode,
 		keywordName, setKeywordName,
+		// applied filter (từ URL) — dùng cho export/lockAll
+		appliedCode: searchParams.get('studentCode') || '',
+		appliedName: searchParams.get('fullName')    || '',
 		sortConfig, handleSort,
-		currentPage, setCurrentPage,
-		pageSize, setPageSize,
+		currentPage: safePage, pageSize,
 		totalPages, safePage, getPageNumbers,
-		fetchStudents, handleSearch, refresh,
+		handleSearch,
+		refresh: afterMutation,
+		// cho StudentTable
+		onPageChange:     (p)    => set({ page: p }),
+		onPageSizeChange: (size) => resetPage({ pageSize: size }),
 	}
 }

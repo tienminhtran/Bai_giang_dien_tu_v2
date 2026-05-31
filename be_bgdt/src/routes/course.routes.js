@@ -19,4 +19,13 @@ router.put('/:id', authenticate, authorize('admin'), courseController.update);
 // DELETE /api/courses/:id - xóa môn học (admin)
 router.delete('/:id', authenticate, authorize('admin'), courseController.remove);
 
+// PATCH /api/courses/:id/count-manager - cập nhật giới hạn số manager (admin)
+router.patch('/:id/count-manager', authenticate, authorize('admin'), courseController.updateCountManager);
+
+// GET /api/courses/my-faculty - trưởng khoa xem môn học của khoa mình (tự resolve từ JWT)
+router.get('/my-faculty', authenticate, authorize('department_head'), courseController.listMyFaculty);
+
+// GET lấy danh sách môn học của 1 khoa (admin xem tất cả, department_head chỉ xem khoa mình)
+router.get('/faculty/:facultyId', authenticate, authorize('admin', 'department_head'), courseController.listByFaculty);
+
 module.exports = router;

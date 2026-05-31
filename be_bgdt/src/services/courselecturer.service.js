@@ -1,10 +1,11 @@
 const { Op } = require('sequelize');
 const { sequelize, CourseLecturer, Course, Lecturer, CourseRole, User } = require('../models');
 const ApiError = require('../utils/ApiError');
+const { assertManagerLimit } = require('../helpers/courseHelpers');
 
 const ALLOWED_ROLES = ['manager', 'member'];
 
-// ── Helper: tìm course_role_id theo role_name ──────────────────────────────
+//  Helper: tìm course_role_id theo role_name 
 const findRoleOrFail = async (role_name) => {
   if (!ALLOWED_ROLES.includes(role_name))
     throw ApiError.badRequest(`Quyền không hợp lệ. Chỉ chấp nhận: ${ALLOWED_ROLES.join(', ')}`);
@@ -13,7 +14,7 @@ const findRoleOrFail = async (role_name) => {
   return role;
 };
 
-// ── 1. Danh sách phân công ─────────────────────────────────────────────────
+//  1. Danh sách phân công 
 const listCourseLecturers = async ({
   lecturer_code, lecturer_name,
   role_name,
@@ -93,7 +94,7 @@ const listCourseLecturers = async ({
   return { total: count, rows };
 };
 
-// ── 2. Phân công giảng viên ────────────────────────────────────────────────
+//  2. Phân công giảng viên 
 const assignLecturer = async ({ course_code, lecturer_code, role_name, assigned_by_user_id }) => {
   if (!course_code)   throw ApiError.badRequest('course_code là bắt buộc');
   if (!lecturer_code) throw ApiError.badRequest('lecturer_code là bắt buộc');
@@ -117,6 +118,8 @@ const assignLecturer = async ({ course_code, lecturer_code, role_name, assigned_
   });
   if (existing) throw ApiError.conflict('Giảng viên này đã được phân công vào môn học');
 
+  if (role_name === 'manager') await assertManagerLimit(course.id);
+
   return CourseLecturer.create({
     course_id:      course.id,
     lecturer_id:    lecturer.id,
@@ -127,17 +130,21 @@ const assignLecturer = async ({ course_code, lecturer_code, role_name, assigned_
   });
 };
 
-// ── 3. Chỉ cập nhật quyền (manager ↔ member) ──────────────────────────────
+//  3. Chỉ cập nhật quyền (manager ↔ member) 
 const updateRole = async (id, role_name) => {
   const record = await CourseLecturer.findByPk(id);
   if (!record) throw ApiError.notFound('Không tìm thấy bản ghi phân công');
+
+  // Kiểm tra giới hạn manager trước khi đổi lên 'manager'
+  // excludeId = record.id để không đếm bản thân nếu đang là manager
+  if (role_name === 'manager') await assertManagerLimit(record.course_id, record.id);
 
   const role = await findRoleOrFail(role_name);
   await record.update({ course_role_id: role.id });
   return record;
 };
 
-// ── 4. Chỉ cập nhật trạng thái is_active ──────────────────────────────────
+//  4. Chỉ cập nhật trạng thái is_active 
 const updateStatus = async (id, is_active) => {
   const record = await CourseLecturer.findByPk(id);
   if (!record) throw ApiError.notFound('Không tìm thấy bản ghi phân công');
@@ -145,7 +152,7 @@ const updateStatus = async (id, is_active) => {
   return record;
 };
 
-// ── 5. Import hàng loạt phân công ─────────────────────────────────────────
+//  5. Import hàng loạt phân công 
 // Body: [{ course_code, lecturer_code, role_name }, ...]
 // Cache course/lecturer/role để tránh query DB lặp khi nhiều dòng giống nhau
 const bulkAssignLecturers = async (rows, assigned_by_user_id) => {
@@ -175,26 +182,29 @@ const bulkAssignLecturers = async (rows, assigned_by_user_id) => {
       const normalizedCourse   = String(course_code).trim().toUpperCase();
       const normalizedLecturer = String(lecturer_code).trim();
 
-      // ── Lookup course (cached) ──────────────────────────────────────────
+      //  Lookup course (cached) 
       if (!courseCache.has(normalizedCourse))
         courseCache.set(normalizedCourse, await Course.findOne({ where: { course_code: normalizedCourse } }));
       const course = courseCache.get(normalizedCourse);
       if (!course)           throw new Error(`Không tìm thấy môn học "${normalizedCourse}"`);
       if (!course.is_active) throw new Error(`Môn học "${normalizedCourse}" đã đóng`);
 
-      // ── Lookup lecturer (cached) ────────────────────────────────────────
+      //  Lookup lecturer (cached) 
       if (!lecturerCache.has(normalizedLecturer))
         lecturerCache.set(normalizedLecturer, await Lecturer.findOne({ where: { lecturer_code: normalizedLecturer } }));
       const lecturer = lecturerCache.get(normalizedLecturer);
       if (!lecturer) throw new Error(`Không tìm thấy giảng viên "${normalizedLecturer}"`);
 
-      // ── Lookup role (cached) ────────────────────────────────────────────
+      //  Lookup role (cached) 
       if (!roleCache.has(role_name))
         roleCache.set(role_name, await CourseRole.findOne({ where: { role_name } }));
       const role = roleCache.get(role_name);
       if (!role) throw new Error(`Không tìm thấy quyền "${role_name}" trong hệ thống`);
 
-      // ── Kiểm tra trùng & tạo ───────────────────────────────────────────
+      //  Kiểm tra giới hạn manager 
+      if (role_name === 'manager') await assertManagerLimit(course.id);
+
+      //  Kiểm tra trùng & tạo 
       await sequelize.transaction(async (t) => {
         const existing = await CourseLecturer.findOne({
           where: { course_id: course.id, lecturer_id: lecturer.id },

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useUrlState } from '@/hooks'
 import * as XLSX from 'xlsx'
 import { Download, FileSpreadsheet, Lock, Unlock, Plus, Search, Edit, Key } from 'lucide-react'
 import { toast } from 'sonner'
@@ -37,50 +38,58 @@ function SortIcon({ column, sortConfig }) {
     : <span className="ml-1 inline-block h-3.5 w-3.5 text-[#08387F]">↓</span>
 }
 
+const URL_DEFAULTS_LM = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0] }
+
 export default function LecturerManagement() {
-  const [faculties, setFaculties]         = useState([])
-  const [majors, setMajors]               = useState([])
+  const { get, set, resetPage, searchParams } = useUrlState(URL_DEFAULTS_LM)
+  const page     = Number(get('page'))     || 1
+  const pageSize = Number(get('pageSize')) || PAGE_SIZE_OPTIONS[0]
+  const [draftCode, setDraftCode] = useState(() => get('lecturerCode'))
+  const [draftName, setDraftName] = useState(() => get('fullName'))
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const [faculties, setFaculties]           = useState([])
+  const [majors, setMajors]                 = useState([])
   const [filteredMajors, setFilteredMajors] = useState([])
-  const [degreeOptions, setDegreeOptions] = useState([])
-  const [lecturers, setLecturers] = useState([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [degreeOptions, setDegreeOptions]   = useState([])
+  const [lecturers, setLecturers]           = useState([])
+  const [total, setTotal]                   = useState(0)
+  const [loading, setLoading]               = useState(false)
+  const [submitting, setSubmitting]         = useState(false)
   const [importSubmitting, setImportSubmitting] = useState(false)
-  const [searchCode, setSearchCode] = useState('')
-  const [searchName, setSearchName] = useState('')
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [isImportOpen, setIsImportOpen] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [editing, setEditing] = useState(null)
-  const [importFile, setImportFile]     = useState(null)
-  const [importResult, setImportResult] = useState(null)
-  const [importedRows, setImportedRows] = useState([])
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', confirmLabel: 'Xác nhận' })
+  const [sortConfig, setSortConfig]         = useState({ key: null, direction: 'asc' })
+  const [isFormOpen, setIsFormOpen]         = useState(false)
+  const [isImportOpen, setIsImportOpen]     = useState(false)
+  const [form, setForm]                     = useState(emptyForm)
+  const [editing, setEditing]               = useState(null)
+  const [importFile, setImportFile]         = useState(null)
+  const [importResult, setImportResult]     = useState(null)
+  const [importedRows, setImportedRows]     = useState([])
+  const [confirmDialog, setConfirmDialog]   = useState({ open: false, title: '', description: '', confirmLabel: 'Xác nhận' })
   const confirmActionRef = useRef(null)
   const fileRef = useRef(null)
-
-  const fetchLecturers = useCallback(async (page = currentPage, size = pageSize, code = searchCode, name = searchName) => {
-    setLoading(true)
-    try {
-      const { rows, total: t } = await lectureService.list({ lecturerCode: code, fullName: name, page, pageSize: size })
-      setLecturers(rows)
-      setTotal(t)
-    } catch (err) {
-      toast.error(err?.response?.data?.message || 'Không tải được danh sách giảng viên')
-    } finally {
-      setLoading(false)
-    }
-  }, [currentPage, pageSize, searchCode, searchName])
 
   useEffect(() => {
     facultyService.list().then(setFaculties).catch(() => {})
     majorService.listAll().then(setMajors).catch(() => {})
     academicDegreeService.list().then(setDegreeOptions).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    const code = searchParams.get('lecturerCode') || ''
+    const name = searchParams.get('fullName') || ''
+    setLoading(true)
+    lectureService.list({ lecturerCode: code, fullName: name, page, pageSize })
+      .then(({ rows, total: t }) => { setLecturers(rows); setTotal(t) })
+      .catch((err) => toast.error(err?.response?.data?.message || 'Không tải được danh sách giảng viên'))
+      .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, refreshKey])
+
+  const afterMutation = useCallback(() => {
+    resetPage()
+    setRefreshKey((k) => k + 1)
+  }, [resetPage])
 
   // Lọc chuyên ngành theo khoa được chọn trong form
   useEffect(() => {
@@ -89,16 +98,11 @@ export default function LecturerManagement() {
     } else {
       setFilteredMajors(majors)
     }
-    // Reset majorId nếu không còn trong danh sách mới
     setForm((cur) => {
       const still = majors.some((m) => m.id === cur.majorId && (!form.facultyId || m.facultyId === form.facultyId))
       return still ? cur : { ...cur, majorId: '' }
     })
   }, [form.facultyId, majors])
-
-  useEffect(() => {
-    fetchLecturers(currentPage, pageSize, searchCode, searchName)
-  }, [currentPage, pageSize])
 
   const sortedLecturers = useMemo(() => {
     if (!sortConfig.key) return lecturers
@@ -111,7 +115,7 @@ export default function LecturerManagement() {
   }, [lecturers, sortConfig])
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const safePage = Math.min(currentPage, totalPages)
+  const safePage   = Math.min(page, totalPages)
 
   const getPageNumbers = () => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -123,10 +127,7 @@ export default function LecturerManagement() {
     return pages
   }
 
-  const handleSearch = () => {
-    setCurrentPage(1)
-    fetchLecturers(1, pageSize, searchCode, searchName)
-  }
+  const handleSearch = () => resetPage({ lecturerCode: draftCode.trim(), fullName: draftName.trim() })
 
   const resetForm = () => setForm(emptyForm)
 
@@ -168,8 +169,7 @@ export default function LecturerManagement() {
       setIsFormOpen(false)
       setEditing(null)
       resetForm()
-      fetchLecturers(1, pageSize, searchCode, searchName)
-      setCurrentPage(1)
+      afterMutation()
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Lưu giảng viên thất bại')
     } finally {
@@ -209,12 +209,11 @@ export default function LecturerManagement() {
       toast.dismiss(loadingToast)
       setImportResult(result)
 
-      if (result.successCount > 0) fetchLecturers(1, pageSize, searchCode, searchName)
+      if (result.successCount > 0) afterMutation()
       if (result.errorCount === 0) {
         toast.success(`Đã nhập ${result.successCount} giảng viên thành công`)
         setIsImportOpen(false)
         setImportFile(null)
-        setCurrentPage(1)
       } else {
         toast.warning(`${result.successCount}/${result.total} thành công — ${result.errorCount} dòng lỗi`)
       }
@@ -276,7 +275,7 @@ export default function LecturerManagement() {
     try {
       await lectureService.lockAccount(lecturer.id, action)
       toast.success(`Đã ${actionLabel} tài khoản giảng viên`)
-      fetchLecturers(currentPage, pageSize, searchCode, searchName)
+      afterMutation()
     } catch (err) {
       toast.error(err?.response?.data?.message || `${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} tài khoản thất bại`)
     }
@@ -319,13 +318,15 @@ export default function LecturerManagement() {
       onConfirm: async () => {
         const loadingToast = toast.loading(`Đang ${actionLabel} toàn bộ tài khoản...`)
         try {
-          const { total } = await lectureService.list({ lecturerCode: searchCode, fullName: searchName, page: 1, pageSize: 1 })
+          const appliedCode = searchParams.get('lecturerCode') || ''
+          const appliedName = searchParams.get('fullName') || ''
+          const { total } = await lectureService.list({ lecturerCode: appliedCode, fullName: appliedName, page: 1, pageSize: 1 })
           if (!total) {
             toast.dismiss(loadingToast)
             toast.error(`Không có giảng viên để ${actionLabel}`)
             return
           }
-          const { rows } = await lectureService.list({ lecturerCode: searchCode, fullName: searchName, page: 1, pageSize: Math.max(total, 1) })
+          const { rows } = await lectureService.list({ lecturerCode: appliedCode, fullName: appliedName, page: 1, pageSize: Math.max(total, 1) })
           const lecturerIds = rows.map((item) => item.id).filter(Boolean)
           const bulkResult = await lectureService.lockAccounts(lecturerIds, action)
           const result = bulkResult?.data || {}
@@ -334,8 +335,7 @@ export default function LecturerManagement() {
           toast.dismiss(loadingToast)
           if (success > 0) toast.success(`Đã ${actionLabel} ${success} tài khoản giảng viên`)
           if (fail > 0) toast.error(`${fail} tài khoản ${actionLabel} thất bại`)
-          fetchLecturers(1, pageSize, searchCode, searchName)
-          setCurrentPage(1)
+          afterMutation()
         } catch (err) {
           toast.dismiss(loadingToast)
           toast.error(err?.response?.data?.message || `${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} toàn bộ thất bại`)
@@ -347,8 +347,10 @@ export default function LecturerManagement() {
   const handleExportExcel = async () => {
     try {
       const loadingToast = toast.loading('Đang tải dữ liệu để xuất Excel...')
-      const { total } = await lectureService.list({ lecturerCode: searchCode, fullName: searchName, page: 1, pageSize: 1 })
-      const { rows } = await lectureService.list({ lecturerCode: searchCode, fullName: searchName, page: 1, pageSize: Math.max(total, 1) })
+      const appliedCode = searchParams.get('lecturerCode') || ''
+      const appliedName = searchParams.get('fullName') || ''
+      const { total } = await lectureService.list({ lecturerCode: appliedCode, fullName: appliedName, page: 1, pageSize: 1 })
+      const { rows } = await lectureService.list({ lecturerCode: appliedCode, fullName: appliedName, page: 1, pageSize: Math.max(total, 1) })
       const data = rows.map((item, index) => ({
         STT: index + 1,
         'Mã giảng viên': item.lecturerCode,
@@ -384,11 +386,11 @@ export default function LecturerManagement() {
           <div className="grid gap-4 xl:grid-cols-[1.2fr_1.2fr_auto]">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700">Mã giảng viên</label>
-              <Input value={searchCode} onChange={(e) => setSearchCode(e.target.value)} placeholder="Nhập mã giảng viên" />
+              <Input value={draftCode} onChange={(e) => setDraftCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} placeholder="Nhập mã giảng viên" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700">Họ tên</label>
-              <Input value={searchName} onChange={(e) => setSearchName(e.target.value)} placeholder="Nhập họ tên" />
+              <Input value={draftName} onChange={(e) => setDraftName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} placeholder="Nhập họ tên" />
             </div>
             <div className="flex items-end">
               <Button type="button" className="w-full bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={handleSearch}>
@@ -495,7 +497,7 @@ export default function LecturerManagement() {
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <span>Hiển thị</span>
-              <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1) }} className="rounded border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]">
+              <select value={pageSize} onChange={(e) => resetPage({ pageSize: Number(e.target.value) })} className="rounded border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]">
                 {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
               </select>
               <span>/ trang — {total} giảng viên</span>
@@ -504,17 +506,17 @@ export default function LecturerManagement() {
             <Pagination className="w-auto justify-end">
               <PaginationContent>
                 <PaginationItem>
-                  <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setCurrentPage((p) => Math.max(1, p - 1)) }} className={safePage === 1 ? 'pointer-events-none opacity-40' : ''} />
+                  <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); if (safePage > 1) set({ page: safePage - 1 }) }} className={safePage === 1 ? 'pointer-events-none opacity-40' : ''} />
                 </PaginationItem>
-                {getPageNumbers().map((page, idx) => page === '...' ? (
+                {getPageNumbers().map((p, idx) => p === '...' ? (
                   <PaginationItem key={`ellipsis-${idx}`}><PaginationEllipsis /></PaginationItem>
                 ) : (
-                  <PaginationItem key={page}>
-                    <PaginationLink href="#" isActive={page === safePage} onClick={(e) => { e.preventDefault(); setCurrentPage(page) }}>{page}</PaginationLink>
+                  <PaginationItem key={p}>
+                    <PaginationLink href="#" isActive={p === safePage} onClick={(e) => { e.preventDefault(); set({ page: p }) }}>{p}</PaginationLink>
                   </PaginationItem>
                 ))}
                 <PaginationItem>
-                  <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setCurrentPage((p) => Math.min(totalPages, p + 1)) }} className={safePage === totalPages ? 'pointer-events-none opacity-40' : ''} />
+                  <PaginationNext href="#" onClick={(e) => { e.preventDefault(); if (safePage < totalPages) set({ page: safePage + 1 }) }} className={safePage === totalPages ? 'pointer-events-none opacity-40' : ''} />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>

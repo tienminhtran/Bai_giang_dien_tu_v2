@@ -152,8 +152,8 @@ export default function StudentManagement() {
 			const { total } = await studentService.list({
 				page: 1,
 				pageSize: 1,
-				studentCode: list.keywordCode,
-				fullName: list.keywordName,
+				studentCode: list.appliedCode,
+				fullName: list.appliedName,
 			})
 
 			if (!total) {
@@ -165,8 +165,8 @@ export default function StudentManagement() {
 			const { rows } = await studentService.list({
 				page: 1,
 				pageSize: Math.max(total, 1),
-				studentCode: list.keywordCode,
-				fullName: list.keywordName,
+				studentCode: list.appliedCode,
+				fullName: list.appliedName,
 			})
 
 			const studentIds = rows.map((student) => student.id).filter(Boolean)
@@ -198,8 +198,8 @@ export default function StudentManagement() {
 	const handleExportExcel = async () => {
 		try {
 			const loadingToast = toast.loading('Đang tải dữ liệu để xuất Excel...')
-			const { total }   = await studentService.list({ page: 1, pageSize: 1, studentCode: list.keywordCode, fullName: list.keywordName })
-			const { rows }    = await studentService.list({ page: 1, pageSize: Math.max(total, 1), studentCode: list.keywordCode, fullName: list.keywordName })
+			const { total }   = await studentService.list({ page: 1, pageSize: 1, studentCode: list.appliedCode, fullName: list.appliedName })
+			const { rows }    = await studentService.list({ page: 1, pageSize: Math.max(total, 1), studentCode: list.appliedCode, fullName: list.appliedName })
 			const data = rows.map((s, i) => ({
 				STT: i + 1, user_id: s.userId,
 				'Mã số sinh viên': s.studentCode, 'Họ tên': s.fullName,
@@ -273,8 +273,8 @@ export default function StudentManagement() {
 				pageSize={list.pageSize}
 				total={list.total}
 				pageSizeOptions={PAGE_SIZE_OPTIONS}
-				onPageChange={list.setCurrentPage}
-				onPageSizeChange={(size) => { list.setPageSize(size); list.setCurrentPage(1) }}
+				onPageChange={list.onPageChange}
+				onPageSizeChange={list.onPageSizeChange}
 				getPageNumbers={list.getPageNumbers}
 				onLock={handleLockStudent}
 				onEdit={openEditDialog}

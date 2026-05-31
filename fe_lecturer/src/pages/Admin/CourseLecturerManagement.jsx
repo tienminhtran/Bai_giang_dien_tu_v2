@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useUrlState } from '@/hooks'
 import * as XLSX from 'xlsx'
-import { Download, Edit, FileSpreadsheet, Plus, Search, Settings, ToggleLeft, ToggleRight, Upload, X } from 'lucide-react'
+import { Download, Edit, FileSpreadsheet, LayoutGrid, Plus, Search, Settings, ToggleLeft, ToggleRight, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import courseLecturerService from '@/services/courseLecturerService'
+import AssignCourseRoleModal from '@/components/modal/AssignCourseRoleModal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -239,33 +241,41 @@ function ImportDialog({ isOpen, onOpenChange, importFile, onFileChange, importRe
   )
 }
 
-//  Trang chính 
+const URL_DEFAULTS_CLM = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0] }
+const FILTER_KEYS = ['lecturerCode', 'lecturerName', 'roleName', 'courseCode', 'courseName', 'assignedByCode', 'assignedByName', 'isActive']
+
+//  Trang chính
 export default function CourseLecturerManagement() {
+  const { get, set, resetPage, searchParams } = useUrlState(URL_DEFAULTS_CLM)
+  const page     = Number(get('page'))     || 1
+  const pageSize = Number(get('pageSize')) || PAGE_SIZE_OPTIONS[0]
+
+  // draft filters (local — chỉ apply khi nhấn Tìm)
+  const [filters, setFilters] = useState(() =>
+    Object.fromEntries(FILTER_KEYS.map((k) => [k, searchParams.get(k) || '']))
+  )
+  const [refreshKey, setRefreshKey] = useState(0)
+
   const [rows, setRows]       = useState([])
   const [total, setTotal]     = useState(0)
   const [loading, setLoading] = useState(false)
-  const [page, setPage]       = useState(1)
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
-  const [filters, setFilters] = useState(emptyFilters)
-  const lastQueryRef = useRef({ page: 1, pageSize: PAGE_SIZE_OPTIONS[0], ...emptyFilters })
 
-  // assign dialog
-  const [assignOpen, setAssignOpen]           = useState(false)
-  const [assignForm, setAssignForm]           = useState(emptyAssignForm)
+  const [assignOpen, setAssignOpen]             = useState(false)
+  const [assignForm, setAssignForm]             = useState(emptyAssignForm)
   const [assignSubmitting, setAssignSubmitting] = useState(false)
 
-  // edit role dialog
   const [roleOpen, setRoleOpen]               = useState(false)
   const [roleRecord, setRoleRecord]           = useState(null)
   const [roleValue, setRoleValue]             = useState('member')
   const [roleSubmitting, setRoleSubmitting]   = useState(false)
 
-  // import dialog
-  const [importOpen, setImportOpen]           = useState(false)
-  const [importFile, setImportFile]           = useState(null)
+  const [bulkOpen, setBulkOpen]                 = useState(false)
+
+  const [importOpen, setImportOpen]             = useState(false)
+  const [importFile, setImportFile]             = useState(null)
   const [importSubmitting, setImportSubmitting] = useState(false)
-  const [importResult, setImportResult]       = useState(null)
-  const [importedRows, setImportedRows]       = useState([])
+  const [importResult, setImportResult]         = useState(null)
+  const [importedRows, setImportedRows]         = useState([])
 
   const totalPages = Math.max(Math.ceil(total / pageSize), 1)
   const safePage   = Math.min(page, totalPages)
@@ -282,31 +292,27 @@ export default function CourseLecturerManagement() {
 
   const setFilter = (field) => (e) => setFilters((p) => ({ ...p, [field]: e.target.value }))
 
-  const fetchRows = async (p = page, ps = pageSize, f = filters) => {
+  useEffect(() => {
+    const f = Object.fromEntries(FILTER_KEYS.map((k) => [k, searchParams.get(k) || '']))
     setLoading(true)
-    try {
-      lastQueryRef.current = { page: p, pageSize: ps, ...f }
-      const { rows: data, total: count } = await courseLecturerService.list({ ...f, page: p, pageSize: ps })
-      setRows(data)
-      setTotal(count)
-      setPage(p)
-      setPageSize(ps)
-    } catch (err) {
-      toast.error(err?.response?.data?.message || 'Không tải được danh sách phân công')
-    } finally {
-      setLoading(false)
-    }
+    courseLecturerService.list({ ...f, page, pageSize })
+      .then(({ rows: data, total: count }) => { setRows(data); setTotal(count) })
+      .catch((err) => toast.error(err?.response?.data?.message || 'Không tải được danh sách phân công'))
+      .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, refreshKey])
+
+  const afterMutation = useCallback(() => {
+    resetPage()
+    setRefreshKey((k) => k + 1)
+  }, [resetPage])
+
+  const handleSearch = () => resetPage(Object.fromEntries(FILTER_KEYS.map((k) => [k, filters[k]])))
+  const handleReset  = () => {
+    const cleared = Object.fromEntries(FILTER_KEYS.map((k) => [k, '']))
+    setFilters(cleared)
+    resetPage(cleared)
   }
-
-  useEffect(() => { fetchRows() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const refresh = () => {
-    const q = lastQueryRef.current
-    fetchRows(q.page, q.pageSize, q)
-  }
-
-  const handleSearch = () => fetchRows(1, pageSize, filters)
-  const handleReset  = () => { setFilters(emptyFilters); fetchRows(1, pageSize, emptyFilters) }
 
   //  Phân công mới 
   const handleAssign = async () => {
@@ -320,7 +326,7 @@ export default function CourseLecturerManagement() {
       toast.success('Phân công giảng viên thành công')
       setAssignOpen(false)
       setAssignForm(emptyAssignForm)
-      refresh()
+      afterMutation()
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Phân công thất bại')
     } finally {
@@ -341,7 +347,7 @@ export default function CourseLecturerManagement() {
       await courseLecturerService.updateRole(roleRecord.id, roleValue)
       toast.success('Cập nhật quyền thành công')
       setRoleOpen(false)
-      refresh()
+      afterMutation()
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Cập nhật quyền thất bại')
     } finally {
@@ -354,7 +360,7 @@ export default function CourseLecturerManagement() {
     try {
       await courseLecturerService.updateStatus(record.id, !record.isActive)
       toast.success(record.isActive ? 'Đã vô hiệu hóa phân công' : 'Đã kích hoạt phân công')
-      refresh()
+      afterMutation()
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Cập nhật trạng thái thất bại')
     }
@@ -511,9 +517,13 @@ export default function CourseLecturerManagement() {
 
           {/* Action bar */}
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" className="border-[#08387F] bg-white text-[#08387F] hover:bg-slate-50" onClick={() => { setAssignForm(emptyAssignForm); setAssignOpen(true) }}>
-              <Plus className="mr-2 h-4 w-4" /> Phân công mới
+            <Button type="button" variant="outline" className="border-[#04a552] bg-white text-[#03951d] hover:bg-[#03951d] hover:text-white" onClick={() => setBulkOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Gán môn học
             </Button>
+            <Button type="button" variant="outline" className="border-[#08387F] bg-white text-[#08387F] hover:bg-slate-50" onClick={() => { setAssignForm(emptyAssignForm); setAssignOpen(true) }}>
+              <Plus className="mr-2 h-4 w-4" /> Gán môn học thủ công
+            </Button>
+
             <Button type="button" variant="outline" className="border-slate-400 bg-white text-slate-600 hover:bg-slate-50" onClick={downloadTemplate}>
               <FileSpreadsheet className="mr-2 h-4 w-4" /> Tải file mẫu
             </Button>
@@ -582,11 +592,14 @@ export default function CourseLecturerManagement() {
                         ? 'rounded-none bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
                         : 'rounded-none bg-rose-100 text-rose-700 hover:bg-rose-100'
                       }>
-                        {r.isActive ? 'Đang hoạt động' : 'Vô hiệu'}
+                        {r.isActive ? 'Hoạt động' : 'Vô hiệu'}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
+                        <Button type="button" variant="ghost" size="icon-sm" title="Xem chi tiết" onClick={() => openRoleEdit(r)}>
+                          <LayoutGrid className="h-4 w-4 text-blue-500" />
+                        </Button>
                         <Button type="button" variant="ghost" size="icon-sm" title="Sửa quyền" onClick={() => openRoleEdit(r)}>
                           <Edit className="h-4 w-4 text-blue-500" />
                         </Button>
@@ -609,7 +622,7 @@ export default function CourseLecturerManagement() {
               <span>Hiển thị</span>
               <select
                 value={pageSize}
-                onChange={(e) => fetchRows(1, Number(e.target.value), filters)}
+                onChange={(e) => resetPage({ pageSize: Number(e.target.value) })}
                 className="rounded border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#08387F]"
               >
                 {PAGE_SIZE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -620,19 +633,19 @@ export default function CourseLecturerManagement() {
             <Pagination className="w-auto justify-end">
               <PaginationContent>
                 <PaginationItem>
-                  <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); if (safePage > 1) fetchRows(safePage - 1, pageSize, filters) }} className={safePage === 1 ? 'pointer-events-none opacity-40' : ''} />
+                  <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); if (safePage > 1) set({ page: safePage - 1 }) }} className={safePage === 1 ? 'pointer-events-none opacity-40' : ''} />
                 </PaginationItem>
                 {getPageNumbers().map((p, idx) =>
                   p === '...' ? (
                     <PaginationItem key={`e-${idx}`}><PaginationEllipsis /></PaginationItem>
                   ) : (
                     <PaginationItem key={p}>
-                      <PaginationLink href="#" isActive={p === safePage} onClick={(e) => { e.preventDefault(); fetchRows(p, pageSize, filters) }}>{p}</PaginationLink>
+                      <PaginationLink href="#" isActive={p === safePage} onClick={(e) => { e.preventDefault(); set({ page: p }) }}>{p}</PaginationLink>
                     </PaginationItem>
                   )
                 )}
                 <PaginationItem>
-                  <PaginationNext href="#" onClick={(e) => { e.preventDefault(); if (safePage < totalPages) fetchRows(safePage + 1, pageSize, filters) }} className={safePage === totalPages ? 'pointer-events-none opacity-40' : ''} />
+                  <PaginationNext href="#" onClick={(e) => { e.preventDefault(); if (safePage < totalPages) set({ page: safePage + 1 }) }} className={safePage === totalPages ? 'pointer-events-none opacity-40' : ''} />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
@@ -671,6 +684,13 @@ export default function CourseLecturerManagement() {
         onImport={handleImport}
         onDownloadErrors={downloadErrors}
         submitting={importSubmitting}
+      />
+
+      {/*  Modal gán quyền môn học theo khoa  */}
+      <AssignCourseRoleModal
+        isOpen={bulkOpen}
+        onOpenChange={setBulkOpen}
+        onSuccess={afterMutation}
       />
     </div>
   )

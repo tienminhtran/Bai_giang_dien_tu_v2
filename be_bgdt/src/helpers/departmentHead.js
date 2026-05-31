@@ -63,4 +63,18 @@ const assertMajorInFaculty = async (majorId, facultyId) => {
   return major;
 };
 
-module.exports = { assertDepartmentHead, resolveHeadFaculty, assertMajorInFaculty };
+/**
+ * Kiểm tra trưởng khoa có thuộc đúng khoa được yêu cầu không.
+ * Dùng cho các endpoint mà department_head chỉ được thao tác trên khoa mình.
+ * Ném lỗi 403/404/422 nếu không hợp lệ.
+ */
+const assertHeadOwnsFaculty = async (lecturerId, facultyId) => {
+  const headFacultyId = await resolveHeadFaculty(lecturerId);
+  if (String(headFacultyId) !== String(facultyId)) {
+    const err = new Error('Bạn không có quyền truy cập dữ liệu của khoa này');
+    err.statusCode = 403;
+    throw err;
+  }
+};
+
+module.exports = { assertDepartmentHead, resolveHeadFaculty, assertMajorInFaculty, assertHeadOwnsFaculty };
