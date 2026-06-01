@@ -2,29 +2,38 @@ import api from '../api/axios'
 import { GRADING_ROUND_EP } from '../constants'
 
 const toFrontend = (r) => ({
-  id:                 r.id,
-  roundName:          r.round_name,
-  councilType:        r.council_type,
-  status:            r.status,
-  note:              r.note || '',
-  courseId:          r.course_id || '',
-  courseCode:        r.Course?.course_code || '',
-  courseName:        r.Course?.course_name || '',
-  criteriaTemplateId: r.criteria_template_id || '',
-  criteriaTemplateName: r.criteriaTemplate?.template_name || '',
-  parentRoundId:     r.parent_round_id || '',
-  parentRoundName:   r.parentRound?.round_name || '',
-  createdAt:         r.created_at || '',
-  startedAt:         r.started_at || '',
-  closedAt:          r.closed_at || '',
+  id:               r.id,
+  sessionId:        r.session_id || '',
+  sessionName:      r.session?.session_name || '',
+  roundName:        r.round_name,
+  roundNumber:      r.round_number ?? 1,
+  facultyScopeId:   r.faculty_scope_id || '',
+  facultyScopeName: r.facultyScope?.faculty_name || '',
+  status:           r.status,
+  parentRoundId:    r.parent_round_id || '',
+  parentRoundName:  r.parentRound?.round_name || '',
+  note:             r.note || '',
+  createdAt:        r.created_at || '',
+  startedAt:        r.started_at || '',
+  closedAt:         r.closed_at || '',
 })
 
-const list = async ({ roundName = '', courseId = '', councilType = '', status = '', page = 1, pageSize = 20 } = {}) => {
+const buildBody = (form) => ({
+  session_id:       form.sessionId || undefined,
+  round_name:       String(form.roundName || '').trim(),
+  round_number:     form.roundNumber === '' || form.roundNumber == null ? undefined : Number(form.roundNumber),
+  faculty_scope_id: form.facultyScopeId || undefined,
+  status:           form.status || 'forming',
+  parent_round_id:  form.parentRoundId || undefined,
+  note:             form.note?.trim() || undefined,
+})
+
+const list = async ({ roundName = '', sessionId = '', facultyScopeId = '', status = '', page = 1, pageSize = 50 } = {}) => {
   const params = { page, pageSize }
-  if (roundName)   params.round_name   = roundName
-  if (courseId)    params.course_id    = courseId
-  if (councilType) params.council_type = councilType
-  if (status)      params.status       = status
+  if (roundName)      params.round_name       = roundName
+  if (sessionId)      params.session_id       = sessionId
+  if (facultyScopeId) params.faculty_scope_id = facultyScopeId
+  if (status)         params.status           = status
 
   const res = await api.get(GRADING_ROUND_EP.LIST, { params })
   const { data, total } = res.data
@@ -35,16 +44,6 @@ const getOne = async (id) => {
   const res = await api.get(GRADING_ROUND_EP.DETAIL(id))
   return toFrontend(res.data.data)
 }
-
-const buildBody = (form) => ({
-  course_id:            form.courseId || undefined,
-  round_name:          String(form.roundName || '').trim(),
-  council_type:        form.councilType,
-  criteria_template_id: form.criteriaTemplateId || undefined,
-  status:              form.status || 'forming',
-  parent_round_id:     form.parentRoundId || undefined,
-  note:                form.note?.trim() || undefined,
-})
 
 const create = async (form) => {
   const res = await api.post(GRADING_ROUND_EP.CREATE, buildBody(form))
@@ -61,16 +60,4 @@ const remove = async (id) => {
   return res.data
 }
 
-// Danh sách mẫu tiêu chí (cho dropdown)
-const listTemplates = async ({ activeOnly = false } = {}) => {
-  const res = await api.get(GRADING_ROUND_EP.TEMPLATES, { params: activeOnly ? { activeOnly: true } : {} })
-  return (res.data.data || []).map((t) => ({
-    id:           t.id,
-    templateName: t.template_name,
-    totalMaxScore: t.total_max_score,
-    passScore:    t.pass_score,
-    isActive:     Boolean(t.is_active),
-  }))
-}
-
-export default { list, getOne, create, update, remove, listTemplates }
+export default { list, getOne, create, update, delete: remove }

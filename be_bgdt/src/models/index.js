@@ -20,8 +20,11 @@ const CourseSection          = require('./CourseSection')(sequelize);
 const LectureVideo           = require('./LectureVideo')(sequelize);
 const LectureVideoVersion    = require('./LectureVideoVersion')(sequelize);
 const GradingCriteriaTemplate = require('./GradingCriteriaTemplate')(sequelize);
+const GradingCriteriaItem    = require('./GradingCriteriaItem')(sequelize);
+const AssessmentSession      = require('./AssessmentSession')(sequelize);
 const GradingRound           = require('./GradingRound')(sequelize);
-const GradingRoundMember     = require('./GradingRoundMember')(sequelize);
+const GradingGroup           = require('./GradingGroup')(sequelize);
+const GradingGroupMember     = require('./GradingGroupMember')(sequelize);
 const GradingRoundVideo      = require('./GradingRoundVideo')(sequelize);
 const VideoGradingScore      = require('./VideoGradingScore')(sequelize);
 const GradingFinalResult     = require('./GradingFinalResult')(sequelize);
@@ -114,24 +117,64 @@ LectureVideo.belongsTo(LectureVideoVersion, {
   as: 'publishedVersion',
 });
 
-// ── Nhóm 6: Hội đồng chấm ────────────────────────────────────────────────────
-Course.hasMany(GradingRound, { foreignKey: 'course_id' });
-GradingRound.belongsTo(Course, { foreignKey: 'course_id' });
+// Tiêu chí chấm (grading_criteria_items) thuộc mẫu tiêu chí
+GradingCriteriaTemplate.hasMany(GradingCriteriaItem, { foreignKey: 'template_id', as: 'items', onDelete: 'CASCADE' });
+GradingCriteriaItem.belongsTo(GradingCriteriaTemplate, { foreignKey: 'template_id', as: 'template' });
 
-GradingCriteriaTemplate.hasMany(GradingRound, { foreignKey: 'criteria_template_id' });
-GradingRound.belongsTo(GradingCriteriaTemplate, { foreignKey: 'criteria_template_id', as: 'criteriaTemplate' });
+// Người tạo mẫu tiêu chí
+User.hasMany(GradingCriteriaTemplate, { foreignKey: 'created_by', as: 'createdTemplates' });
+GradingCriteriaTemplate.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+
+// ── Nhóm 6: Kiểm định bài giảng (Session → Round → Group → Member) ───────────
+// Đợt kiểm định (assessment_sessions)
+AcademicTerm.hasMany(AssessmentSession, { foreignKey: 'academic_term_id' });
+AssessmentSession.belongsTo(AcademicTerm, { foreignKey: 'academic_term_id', as: 'academicTerm' });
+
+GradingCriteriaTemplate.hasMany(AssessmentSession, { foreignKey: 'criteria_template_id' });
+AssessmentSession.belongsTo(GradingCriteriaTemplate, { foreignKey: 'criteria_template_id', as: 'criteriaTemplate' });
+
+User.hasMany(AssessmentSession, { foreignKey: 'created_by', as: 'createdSessions' });
+AssessmentSession.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+
+// Vòng chấm (grading_rounds)
+AssessmentSession.hasMany(GradingRound, { foreignKey: 'session_id', as: 'rounds' });
+GradingRound.belongsTo(AssessmentSession, { foreignKey: 'session_id', as: 'session' });
+
+Faculty.hasMany(GradingRound, { foreignKey: 'faculty_scope_id', as: 'scopedRounds' });
+GradingRound.belongsTo(Faculty, { foreignKey: 'faculty_scope_id', as: 'facultyScope' });
 
 GradingRound.hasMany(GradingRound, { foreignKey: 'parent_round_id', as: 'childRounds' });
 GradingRound.belongsTo(GradingRound, { foreignKey: 'parent_round_id', as: 'parentRound' });
 
-GradingRound.hasMany(GradingRoundMember, { foreignKey: 'round_id' });
-GradingRoundMember.belongsTo(GradingRound, { foreignKey: 'round_id' });
+// Nhóm/Hội đồng chấm (grading_groups)
+GradingRound.hasMany(GradingGroup, { foreignKey: 'round_id', as: 'groups' });
+GradingGroup.belongsTo(GradingRound, { foreignKey: 'round_id', as: 'round' });
 
-Lecturer.hasMany(GradingRoundMember, { foreignKey: 'lecturer_id' });
-GradingRoundMember.belongsTo(Lecturer, { foreignKey: 'lecturer_id' });
+Faculty.hasMany(GradingGroup, { foreignKey: 'faculty_id', as: 'gradingGroups' });
+GradingGroup.belongsTo(Faculty, { foreignKey: 'faculty_id', as: 'faculty' });
 
+User.hasMany(GradingGroup, { foreignKey: 'created_by', as: 'createdGroups' });
+GradingGroup.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+
+// Thành viên nhóm chấm (grading_group_members)
+GradingGroup.hasMany(GradingGroupMember, { foreignKey: 'group_id', as: 'members' });
+GradingGroupMember.belongsTo(GradingGroup, { foreignKey: 'group_id', as: 'group' });
+
+Lecturer.hasMany(GradingGroupMember, { foreignKey: 'lecturer_id' });
+GradingGroupMember.belongsTo(Lecturer, { foreignKey: 'lecturer_id', as: 'lecturer' });
+
+User.hasMany(GradingGroupMember, { foreignKey: 'assigned_by', as: 'assignedGroupMembers' });
+GradingGroupMember.belongsTo(User, { foreignKey: 'assigned_by', as: 'assignedByUser' });
+
+// Video trong vòng chấm (grading_round_videos)
 GradingRound.hasMany(GradingRoundVideo, { foreignKey: 'round_id' });
 GradingRoundVideo.belongsTo(GradingRound, { foreignKey: 'round_id' });
+
+GradingGroup.hasMany(GradingRoundVideo, { foreignKey: 'group_id', as: 'videos' });
+GradingRoundVideo.belongsTo(GradingGroup, { foreignKey: 'group_id', as: 'group' });
+
+GradingRoundVideo.hasMany(GradingRoundVideo, { foreignKey: 'source_round_video_id', as: 'derivedVideos' });
+GradingRoundVideo.belongsTo(GradingRoundVideo, { foreignKey: 'source_round_video_id', as: 'sourceVideo' });
 
 LectureVideo.hasMany(GradingRoundVideo, { foreignKey: 'video_id' });
 GradingRoundVideo.belongsTo(LectureVideo, { foreignKey: 'video_id' });
@@ -191,8 +234,11 @@ module.exports = {
   LectureVideo,
   LectureVideoVersion,
   GradingCriteriaTemplate,
+  GradingCriteriaItem,
+  AssessmentSession,
   GradingRound,
-  GradingRoundMember,
+  GradingGroup,
+  GradingGroupMember,
   GradingRoundVideo,
   VideoGradingScore,
   GradingFinalResult,

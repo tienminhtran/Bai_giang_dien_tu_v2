@@ -7,22 +7,22 @@ module.exports = (sequelize) => {
       primaryKey: true,
       defaultValue: DataTypes.UUIDV4,
     },
-    course_id: {
+    session_id: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
     },
     round_name: {
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    council_type: {
-      type: DataTypes.STRING(20),
+    round_number: {
+      type: DataTypes.INTEGER,
       allowNull: false,
-      // 'evaluator' | 'secretary'
+      defaultValue: 1,
     },
-    criteria_template_id: {
+    faculty_scope_id: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
     },
     status: {
       type: DataTypes.STRING(20),

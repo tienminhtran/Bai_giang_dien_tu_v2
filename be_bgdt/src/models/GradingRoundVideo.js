@@ -11,6 +11,14 @@ module.exports = (sequelize) => {
       type: DataTypes.UUID,
       allowNull: false,
     },
+    group_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+    source_round_video_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     video_id: {
       type: DataTypes.UUID,
       allowNull: false,

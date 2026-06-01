@@ -1,14 +1,14 @@
-const roundService = require('../services/gradinground.service');
+const sessionService = require('../services/assessmentsession.service');
 
-// GET /api/grading-rounds?round_name=&session_id=&faculty_scope_id=&status=&page=&pageSize=
+// GET /api/assessment-sessions?session_name=&academic_term_id=&status=&page=&pageSize=
 const list = async (req, res) => {
   try {
-    const { round_name, session_id, faculty_scope_id, status, page = 1, pageSize = 20 } = req.query;
+    const { session_name, academic_term_id, status, page = 1, pageSize = 20 } = req.query;
     const pageNum = Math.max(Number(page) || 1, 1);
     const size    = Math.max(Number(pageSize) || 20, 1);
 
-    const { total, rows } = await roundService.listRounds({
-      round_name, session_id, faculty_scope_id, status,
+    const { total, rows } = await sessionService.listSessions({
+      session_name, academic_term_id, status,
       page: pageNum, pageSize: size,
     });
     return res.json({ success: true, data: rows, total, page: pageNum, pageSize: size });
@@ -18,43 +18,43 @@ const list = async (req, res) => {
   }
 };
 
-// GET /api/grading-rounds/:id
+// GET /api/assessment-sessions/:id
 const getOne = async (req, res) => {
   try {
-    const round = await roundService.getRound(req.params.id);
-    return res.json({ success: true, data: round });
+    const session = await sessionService.getSession(req.params.id);
+    return res.json({ success: true, data: session });
   } catch (err) {
     console.error(err);
     return res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Lỗi server' });
   }
 };
 
-// POST /api/grading-rounds
+// POST /api/assessment-sessions
 const create = async (req, res) => {
   try {
-    const round = await roundService.createRound(req.body || {}, req.user?.id);
-    return res.status(201).json({ success: true, message: 'Tạo đợt kiểm định thành công', data: round });
+    const session = await sessionService.createSession(req.body || {}, req.user?.id);
+    return res.status(201).json({ success: true, message: 'Tạo đợt kiểm định thành công', data: session });
   } catch (err) {
     console.error(err);
     return res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Lỗi server' });
   }
 };
 
-// PUT /api/grading-rounds/:id
+// PUT /api/assessment-sessions/:id
 const update = async (req, res) => {
   try {
-    const round = await roundService.updateRound(req.params.id, req.body || {});
-    return res.json({ success: true, message: 'Cập nhật đợt kiểm định thành công', data: round });
+    const session = await sessionService.updateSession(req.params.id, req.body || {});
+    return res.json({ success: true, message: 'Cập nhật đợt kiểm định thành công', data: session });
   } catch (err) {
     console.error(err);
     return res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Lỗi server' });
   }
 };
 
-// DELETE /api/grading-rounds/:id
+// DELETE /api/assessment-sessions/:id
 const remove = async (req, res) => {
   try {
-    await roundService.deleteRound(req.params.id);
+    await sessionService.deleteSession(req.params.id);
     return res.json({ success: true, message: 'Xóa đợt kiểm định thành công' });
   } catch (err) {
     console.error(err);

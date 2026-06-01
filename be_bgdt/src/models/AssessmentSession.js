@@ -1,13 +1,13 @@
-﻿const { DataTypes } = require('sequelize');
+const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
-  const GradingCriteriaTemplate = sequelize.define('GradingCriteriaTemplate', {
+  const AssessmentSession = sequelize.define('AssessmentSession', {
     id: {
       type: DataTypes.UUID,
       primaryKey: true,
       defaultValue: DataTypes.UUIDV4,
     },
-    template_name: {
+    session_name: {
       type: DataTypes.STRING(255),
       allowNull: false,
     },
@@ -15,20 +15,27 @@ module.exports = (sequelize) => {
       type: DataTypes.TEXT,
       allowNull: true,
     },
-    total_max_score: {
-      type: DataTypes.DECIMAL(5, 2),
+    academic_term_id: {
+      type: DataTypes.UUID,
       allowNull: false,
-      defaultValue: 100,
     },
-    pass_score: {
-      type: DataTypes.DECIMAL(5, 2),
+    criteria_template_id: {
+      type: DataTypes.UUID,
       allowNull: false,
-      defaultValue: 70,
     },
-    is_active: {
-      type: DataTypes.BOOLEAN,
+    start_date: {
+      type: DataTypes.DATEONLY,
       allowNull: false,
-      defaultValue: true,
+    },
+    end_date: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+    },
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'draft',
+      // 'draft' | 'active' | 'closed'
     },
     created_by: {
       type: DataTypes.UUID,
@@ -42,9 +49,9 @@ module.exports = (sequelize) => {
       allowNull: true,
     },
   }, {
-    tableName: 'grading_criteria_templates',
+    tableName: 'assessment_sessions',
     timestamps: false,
   });
 
-  return GradingCriteriaTemplate;
+  return AssessmentSession;
 };

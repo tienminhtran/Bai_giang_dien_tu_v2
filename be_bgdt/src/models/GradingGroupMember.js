@@ -1,13 +1,13 @@
-﻿const { DataTypes } = require('sequelize');
+const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
-  const GradingRoundMember = sequelize.define('GradingRoundMember', {
+  const GradingGroupMember = sequelize.define('GradingGroupMember', {
     id: {
       type: DataTypes.UUID,
       primaryKey: true,
       defaultValue: DataTypes.UUIDV4,
     },
-    round_id: {
+    group_id: {
       type: DataTypes.UUID,
       allowNull: false,
     },
@@ -21,6 +21,10 @@ module.exports = (sequelize) => {
       defaultValue: 'member',
       // 'chair' | 'member' | 'secretary'
     },
+    position_title: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
     assigned_by: {
       type: DataTypes.UUID,
       allowNull: false,
@@ -28,10 +32,15 @@ module.exports = (sequelize) => {
     assigned_at: {
       type: DataTypes.DATE,
     },
+    is_active: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
   }, {
-    tableName: 'grading_round_members',
+    tableName: 'grading_group_members',
     timestamps: false,
   });
 
-  return GradingRoundMember;
+  return GradingGroupMember;
 };

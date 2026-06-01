@@ -21,7 +21,9 @@ router.use('/enrollments',    require('./enrollment.routes'));
 router.use('/academic-terms',    require('./academicterm.routes'));
 router.use('/course-lecturers',  require('./courselecturer.routes'));
 router.use('/department-head',   require('./departmentHead.routes'));
+router.use('/assessment-sessions', require('./assessmentsession.routes'));
 router.use('/grading-rounds',    require('./gradinground.routes'));
+router.use('/grading-groups',    require('./gradinggroup.routes'));
 router.use('/grading-criteria-templates', require('./gradingtemplate.routes'));
 
 module.exports = router;
