@@ -136,9 +136,9 @@ export default function UserRole() {
                   key={role}
                   onClick={() => handleSelectRole(role)}
                   disabled={fetching}
-                  className={`w-full group flex items-center gap-4 p-5 bg-white border-2 ${cfg.border} shadow-lg transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.99] disabled:opacity-60`}
+                  className={`w-full group flex items-center gap-4 p-5 rounded-xl bg-white border-2 ${cfg.border} shadow-lg transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.99] disabled:opacity-60`}
                 >
-                  <div className={`w-14 h-14 rounded-xl ${cfg.iconBg} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                  <div className={`w-14 h-14 rounded-full ${cfg.iconBg} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
                     <Icon size={28} className={cfg.iconColor} strokeWidth={1.8} />
                   </div>
                   <div className="flex-1 text-left">

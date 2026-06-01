@@ -30,6 +30,7 @@ import DepartmentHeadCourseManagement   from './DepartmentHead/CourseManagement'
 import AdminMajorManagement             from './Admin/MajorManagement'
 import CourseDetail                     from './Admin/CourseDetail'
 import FacultyDetail                    from './Admin/FacultyDetail'
+import GradingRoundManagement           from './Admin/GradingRoundManagement'
 import MajorHeadDashboardPage        from './MajorHead/Dashboard'
 
 // ── Cấu hình menu theo role ─────────────────────────────────────────────────
@@ -52,6 +53,7 @@ const MENU_CONFIG = {
         title: 'Kiểm định',
         items: [
           { label: 'Đợt kiểm định', icon: ClipboardList, path: '/dashboard/admin/grading-rounds' },
+          { label: 'Lập Hội đồng', icon: UserCog, path: '/dashboard/admin/grading-round-members' },          
           { label: 'Tiêu chí',      icon: ListChecks,    path: '/dashboard/admin/criteria' },
           { label: 'Bảng điểm',      icon: FileText,      path: '/dashboard/admin/scores' },
         ],
@@ -196,7 +198,7 @@ export default function Dashboard() {
             <Route path="lecturers"         element={<LecturerManagement />} />
             <Route path="lecturer-accounts" element={<div className="text-slate-500 py-10 text-center">Tài khoản giảng viên — đang phát triển</div>} />
             <Route path="lecturer-roles"    element={<LecturerRoleManagement />} />
-            <Route path="grading-rounds"    element={<div className="text-slate-500 py-10 text-center">Đợt kiểm định — đang phát triển</div>} />
+            <Route path="grading-rounds"    element={<GradingRoundManagement />} />
             <Route path="criteria"          element={<div className="text-slate-500 py-10 text-center">Tiêu chí — đang phát triển</div>} />
             <Route path="scores"            element={<div className="text-slate-500 py-10 text-center">Bản điểm — đang phát triển</div>} />
             <Route path="courses"                          element={<CourseManagement />} />
