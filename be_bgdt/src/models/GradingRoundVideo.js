@@ -31,12 +31,14 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: 'pending',
-      // 'pending' | 'grading' | 'scored'
+      // 'pending' | 'grading' | 'graded'
+      // 'đang chờ xử lý' | 'chấm điểm' | 'đã chấm điểm'
     },
     grading_result: {
       type: DataTypes.STRING(20),
       allowNull: true,
       // 'passed' | 'needs_revision' | 'failed'
+      // 'đã vượt qua - xuất bản' | 'cần xem xét lại' | 'thất bại'
     },
     is_published: {
       type: DataTypes.BOOLEAN,

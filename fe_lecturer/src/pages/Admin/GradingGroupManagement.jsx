@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, BadgeAlert, Building2, Eye, LayoutGrid, Plus, Trash2, UserPlus, X } from 'lucide-react'
+import { ArrowRight, BadgeAlert, BadgeCheck, Building2, Eye, LayoutGrid, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSearchParams } from 'react-router-dom'
 import assessmentSessionService from '@/services/assessmentSessionService'
@@ -969,7 +969,7 @@ export default function GradingGroupManagement() {
                     <TableRow>
                       <TableHead>Tên nhóm/Nhóm chấm/Khoa</TableHead>
                       <TableHead className="w-[220px]">Vòng chấm</TableHead>
-                      <TableHead className="w-[220px]">Khoa kiểm định</TableHead>
+                      <TableHead className="w-[220px]">Khoa được kiểm định</TableHead>
                       <TableHead className="w-[110px]">Số Thành viên</TableHead>
                       <TableHead className="w-[140px]">Thành viên chấm</TableHead>
                       <TableHead className="w-[140px]">Trạng thái</TableHead>
@@ -1000,12 +1000,22 @@ export default function GradingGroupManagement() {
                 
                             </div>
                           </TableCell>
-                          <TableCell><Badge className={`rounded-none ${st.badge}`}>{st.label}</Badge></TableCell>
+                          <TableCell>
+                            <Button type="button" variant="ghost" size="icon-sm" title="Điều chỉnh trạng thái Vòng chấm" onClick={() => setDetailGroupId(g.id)}>
+                              <BadgeAlert className="h-4 w-4 text-blue-500" />
+                            </Button>                            
+                            <Badge className={`rounded-none ${st.badge}`}>{st.label}</Badge>
+
+                          </TableCell>
                           <TableCell>
                             {/* Xem chi tiết */}
-                            <Button type="button" variant="outline" size="sm" onClick={() => setDetailGroupId(g.id)}>
+                            <Button type="button" variant="ghost" size="sm" title="Xem chi tiết nhóm" className="text-blue-500 hover:text-blue-600" onClick={() => setDetailGroupId(g.id)}>
                               <LayoutGrid className="mr-1 h-4 w-4" />
-                              Xem chi tiết
+                            </Button>
+
+                            {/* gán vòng chấm */}
+                            <Button type="button" variant="outline" size="icon-sm" title="Gán vòng chấm" onClick={() => setDetailGroupId(g.id)}>
+                              <BadgeCheck className="h-4 w-4 text-green-500" />
                             </Button>
 
                             <Button type="button" variant="ghost" size="icon-sm" title="Chức năng phân công riêng lẻ" onClick={() => setDetailGroupId(g.id)}>

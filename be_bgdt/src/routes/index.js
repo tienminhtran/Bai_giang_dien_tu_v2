@@ -26,5 +26,7 @@ router.use('/grading-rounds',    require('./gradinground.routes'));
 router.use('/grading-groups',    require('./gradinggroup.routes'));
 router.use('/grading-teams',     require('./gradingteam.routes'));
 router.use('/grading-criteria-templates', require('./gradingtemplate.routes'));
+router.use('/lecture-videos',    require('./lecturevideo.routes'));
+router.use('/sections',          require('./section.routes'));
 
 module.exports = router;

@@ -36,6 +36,7 @@ module.exports = (sequelize) => {
       allowNull: false,
       defaultValue: 'registered',
       // 'registered' | 'under_review' | 'revision' | 'secretary_review' | 'published' | 'rejected'
+      // 'đã đăng ký' | 'đang được xem xét' | 'sửa đổi' | 'chấm lại' | 'đã xuất bản' | 'vật bị loại bỏ'
     },
     current_published_version_id: {
       type: DataTypes.UUID,

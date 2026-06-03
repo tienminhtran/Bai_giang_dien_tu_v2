@@ -58,8 +58,8 @@ const MENU_CONFIG = {
         items: [
           { label: 'Tiêu chí chấm',      icon: ListChecks,    path: '/dashboard/admin/criteria' },
           { label: 'Đợt kiểm định', icon: ClipboardList, path: '/dashboard/admin/assessment-sessions' },
-          { label: 'Lập Nhóm Hội đồng', icon: UserCog, path: '/dashboard/admin/grading-round-members' },          
-          { label: 'Bảng điểm',      icon: FileText,      path: '/dashboard/admin/scores' },
+          { label: 'Lập Nhóm Hội đồng', icon: UserCog, path: '/dashboard/admin/grading-round-members' },
+          { label: 'Bảng điểm chấm',      icon: FileText,      path: '/dashboard/admin/scores' },
         ],
       },
       {

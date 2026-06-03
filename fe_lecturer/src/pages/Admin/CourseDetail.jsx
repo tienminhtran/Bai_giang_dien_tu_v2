@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import * as XLSX from 'xlsx'
-import { ArrowLeft, Download, Edit, FileSpreadsheet, Plus, Settings, ToggleLeft, ToggleRight, Upload } from 'lucide-react'
+import { ArrowLeft, Download, Edit, FileSpreadsheet, FileVideoIcon, Film, FolderPlus, Plus, Settings, ToggleLeft, ToggleRight, Trash2, Upload, Video } from 'lucide-react'
 import { toast } from 'sonner'
 import courseService from '@/services/courseService'
 import courseLecturerService from '@/services/courseLecturerService'
+import sectionService from '@/services/sectionService'
+import lectureVideoService, { VIDEO_STATUS_LABEL } from '@/services/lectureVideoService'
+import HlsPlayer from '@/components/video/HlsPlayer'
 import AssignCourseRoleModal from '@/components/modal/AssignCourseRoleModal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,15 +34,33 @@ const ROLE_BADGE = {
   member:  'bg-sky-100 text-sky-700 hover:bg-sky-100',
 }
 
+const VIDEO_STATUS_BADGE = {
+  registered:       'bg-slate-100 text-slate-700 hover:bg-slate-100',
+  under_review:     'bg-amber-100 text-amber-700 hover:bg-amber-100',
+  revision:         'bg-orange-100 text-orange-700 hover:bg-orange-100',
+  secretary_review: 'bg-blue-100 text-blue-700 hover:bg-blue-100',
+  published:        'bg-emerald-100 text-emerald-700 hover:bg-emerald-100',
+  rejected:         'bg-rose-100 text-rose-700 hover:bg-rose-100',
+}
+
 const formatDate = (val) => {
   if (!val) return '—'
   try { return new Date(val).toLocaleDateString('vi-VN') } catch { return val }
 }
 
+const formatDuration = (sec) => {
+  if (sec == null || Number.isNaN(sec)) return '—'
+  const s = Math.round(sec)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = String(s % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
+}
+
 const TABS = [
   { key: 'info',      label: 'Mô tả môn học' },
   { key: 'lecturers', label: 'Danh sách giảng viên của môn' },
-  { key: 'video',  label: 'Video bài giảng' },
+  { key: 'video',  label: 'Quản lý video bài giảng' },
 ]
 
 // ── Import dialog (dành riêng cho 1 môn học — chỉ cần 2 cột) ──────────────
@@ -177,6 +198,28 @@ export default function CourseDetail() {
   const [assignForm, setAssignForm]             = useState({ lecturerCode: '', roleName: 'member' })
   const [assignSubmitting, setAssignSubmitting] = useState(false)
 
+  // ── Video bài giảng (Chuyên đề/ Chương + video) ──────────────────────────────────────
+  const [sections, setSections]           = useState([])
+  const [videos, setVideos]               = useState([])
+  const [videoLoading, setVideoLoading]   = useState(false)
+  const [videoRefreshKey, setVideoRefreshKey] = useState(0)
+
+  // Dialog Chuyên đề/ Chương (create/edit)
+  const [sectionDialogOpen, setSectionDialogOpen]   = useState(false)
+  const [sectionEditing, setSectionEditing]         = useState(null) // null = tạo mới
+  const [sectionForm, setSectionForm]               = useState({ title: '', description: '' })
+  const [sectionSubmitting, setSectionSubmitting]   = useState(false)
+
+  // Dialog thêm video
+  const [videoDialogOpen, setVideoDialogOpen]       = useState(false)
+  const [videoForm, setVideoForm]                   = useState({ sectionId: '', title: '', description: '' })
+  const [videoFile, setVideoFile]                   = useState(null)
+  const [videoSubmitting, setVideoSubmitting]       = useState(false)
+
+  // Modal xem video
+  const [viewOpen, setViewOpen]   = useState(false)
+  const [viewVideo, setViewVideo] = useState(null)
+
   // tải thông tin môn học nếu không có trong state
   useEffect(() => {
     if (courseInfo) { setCourseLoading(false); return }
@@ -196,6 +239,93 @@ export default function CourseDetail() {
   }, [courseCode, page, refreshKey])
 
   const afterMutation = () => { setPage(1); setRefreshKey((k) => k + 1) }
+
+  // ── Tải Chuyên đề/ Chương + video khi mở tab video ───────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'video' || !courseInfo?.id) return
+    setVideoLoading(true)
+    Promise.all([
+      sectionService.list(courseInfo.id),
+      lectureVideoService.list({ courseId: courseInfo.id }),
+    ])
+      .then(([secs, vids]) => { setSections(secs); setVideos(vids) })
+      .catch(() => toast.error('Không tải được dữ liệu video bài giảng'))
+      .finally(() => setVideoLoading(false))
+  }, [activeTab, courseInfo?.id, videoRefreshKey])
+
+  const refreshVideos = () => setVideoRefreshKey((k) => k + 1)
+
+  // ── Chuyên đề/ Chương (section) ──────────────────────────────────────────────────────
+  const openCreateSection = () => { setSectionEditing(null); setSectionForm({ title: '', description: '' }); setSectionDialogOpen(true) }
+  const openEditSection   = (s) => { setSectionEditing(s); setSectionForm({ title: s.title, description: s.description }); setSectionDialogOpen(true) }
+
+  const handleSubmitSection = async () => {
+    if (!sectionForm.title.trim()) { toast.error('Vui lòng nhập tên Chuyên đề/ Chương'); return }
+    try {
+      setSectionSubmitting(true)
+      if (sectionEditing) {
+        await sectionService.update(sectionEditing.id, { title: sectionForm.title, description: sectionForm.description })
+        toast.success('Cập nhật Chuyên đề/ Chương thành công')
+      } else {
+        await sectionService.create({ courseId: courseInfo.id, title: sectionForm.title, description: sectionForm.description })
+        toast.success('Tạo Chuyên đề/ Chương thành công')
+      }
+      setSectionDialogOpen(false)
+      refreshVideos()
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Lưu Chuyên đề/ Chương thất bại')
+    } finally {
+      setSectionSubmitting(false)
+    }
+  }
+
+  const handleDeleteSection = async (s) => {
+    if (!window.confirm(`Xóa Chuyên đề/ Chương "${s.title}"?`)) return
+    try {
+      await sectionService.delete(s.id)
+      toast.success('Đã xóa Chuyên đề/ Chương')
+      refreshVideos()
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Xóa Chuyên đề/ Chương thất bại')
+    }
+  }
+
+  // ── Thêm video ────────────────────────────────────────────────────────────
+  const openAddVideo = (sectionId = '') => {
+    if (sections.length === 0) { toast.error('Hãy tạo Chuyên đề/ Chương trước khi thêm video'); return }
+    setVideoForm({ sectionId: sectionId || sections[0]?.id || '', title: '', description: '' })
+    setVideoFile(null)
+    setVideoDialogOpen(true)
+  }
+
+  const handleSubmitVideo = async () => {
+    if (!videoForm.sectionId)    { toast.error('Vui lòng chọn Chuyên đề/ Chương'); return }
+    if (!videoForm.title.trim()) { toast.error('Vui lòng nhập tiêu đề video'); return }
+    if (!videoFile)              { toast.error('Vui lòng chọn file video'); return }
+    try {
+      setVideoSubmitting(true)
+      await lectureVideoService.create({
+        sectionId:   videoForm.sectionId,
+        title:       videoForm.title,
+        description: videoForm.description,
+        file:        videoFile,
+      })
+      toast.success('Đăng ký video thành công')
+      setVideoDialogOpen(false)
+      refreshVideos()
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Đăng ký video thất bại')
+    } finally {
+      setVideoSubmitting(false)
+    }
+  }
+
+  // ── Xem video ─────────────────────────────────────────────────────────────
+  const openViewVideo = (v) => {
+    if (!v?.latestVersion) { toast.error('Video chưa có bản phát (HLS) để xem'); return }
+    setViewVideo(v)
+    setViewOpen(true)
+  }
 
   // ── Thêm giảng viên thủ công ──────────────────────────────────────────────
   const handleAssign = async () => {
@@ -620,6 +750,134 @@ export default function CourseDetail() {
         </Card>
       )}
 
+      {/* ══════════════════════════════════════════════════════════════════════
+          Tab 3 — Quản lý video bài giảng
+      ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'video' && (
+        <Card className="border-slate-200 shadow-sm rounded-t-none">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg font-bold text-slate-900">Quản lý video bài giảng</CardTitle>
+                <CardDescription>
+                  Quản lý Chuyên đề/ Chương và video bài giảng cho môn <strong>{courseCode}</strong>.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline"
+                  className="border-[#08387F] bg-white text-[#08387F] hover:bg-slate-50"
+                  onClick={openCreateSection}>
+                  <FolderPlus className="mr-2 h-4 w-4" /> Tạo mới Chuyên đề/Chương
+                </Button>
+                <Button type="button"
+                  className="bg-[#08387F] text-white hover:bg-[#072f6a]"
+                  onClick={() => openAddVideo()}>
+                  <Video className="mr-2 h-4 w-4" /> Thêm video bài giảng
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {videoLoading ? (
+              <p className="py-10 text-center text-sm text-slate-400">Đang tải...</p>
+            ) : sections.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 py-12 text-center">
+                <Film className="h-10 w-10 text-slate-300" />
+                <p className="text-sm font-medium text-slate-600">Chưa có Chuyên đề/ Chương nào.</p>
+                <p className="text-xs text-slate-400">Hãy tạo Chuyên đề/ Chương trước, sau đó thêm video bài giảng vào từng Chuyên đề/ Chương.</p>
+                <Button type="button" variant="outline" className="mt-1 border-[#08387F] text-[#08387F] hover:bg-slate-50" onClick={openCreateSection}>
+                  <FolderPlus className="mr-2 h-4 w-4" /> Tạo Chuyên đề/ Chương đầu tiên
+                </Button>
+              </div>
+            ) : (
+              sections.map((sec) => {
+                const secVideos = videos.filter((v) => v.sectionId === sec.id)
+                return (
+                  <div key={sec.id} className="overflow-hidden rounded-xl border border-slate-200">
+                    {/* Thanh tiêu đề Chuyên đề/ Chương */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#08387F] text-[11px] font-bold text-white">{sec.order}</span>
+                        <span className="font-semibold text-slate-800">{sec.title}</span>
+                        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600">{secVideos.length} video</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-[#08387F] hover:bg-blue-50"
+                          onClick={() => openAddVideo(sec.id)}>
+                          <Plus className="h-3.5 w-3.5" /> Thêm video
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon-sm" title="Sửa thông tin Chuyên đề/ Chương" onClick={() => openEditSection(sec)}>
+                          <Edit className="h-4 w-4 text-slate-500" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon-sm" title="Xóa Chuyên đề/ Chương này" onClick={() => handleDeleteSection(sec)}>
+                          <Trash2 className="h-4 w-4 text-rose-500" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Bảng video trong Chuyên đề/ Chương */}
+                    {secVideos.length === 0 ? (
+                      <p className="px-4 py-4 text-center text-xs text-slate-400">Chuyên đề/ Chương này chưa có video.</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10">STT</TableHead>
+                            <TableHead className="whitespace-nowrap">Tiêu đề</TableHead>
+                            <TableHead className="whitespace-nowrap">Phiên bản</TableHead>
+                            <TableHead className="whitespace-nowrap">Người tạo</TableHead>
+                            <TableHead className="whitespace-nowrap">Ngày tạo</TableHead>
+                            <TableHead className="whitespace-nowrap">Trạng thái</TableHead>
+                            <TableHead className="w-px whitespace-nowrap">Hành động</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {secVideos.map((v, idx) => (
+                            <TableRow key={v.id}>
+                              <TableCell className="text-slate-500">{idx + 1}</TableCell>
+                              <TableCell className="max-w-xs">
+                                <div className="font-medium text-slate-900">{v.title}</div>
+                                {v.description && <div className="truncate text-xs text-slate-400">{v.description}</div>}
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap text-sm text-slate-600">
+                                {v.latestVersion ? `v${v.latestVersion}` : '—'}
+                                {v.versionCount > 1 && <span className="ml-1 text-xs text-slate-400">({v.versionCount} bản)</span>}
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap text-sm text-slate-600">{v.uploaderName || '—'}</TableCell>
+                              <TableCell className="whitespace-nowrap text-sm text-slate-500">{formatDate(v.uploadedAt)}</TableCell>
+                              <TableCell>
+                                <Badge className={`rounded-none ${VIDEO_STATUS_BADGE[v.status] || 'bg-slate-100 text-slate-700'}`}>
+                                  {v.statusLabel || VIDEO_STATUS_LABEL[v.status] || v.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  {/* xem video */}
+                                  <Button type="button" variant="ghost" size="icon-sm" title="Xem video" onClick={() => openViewVideo(v)}>
+                                    <FileVideoIcon className="h-4 w-4 text-slate-500" />
+                                  </Button>
+                                  {/* sửa video */}
+                                  <Button type="button" variant="ghost" size="icon-sm" title="Sửa video" onClick={() => openEditVideo(v)}>
+                                    <Edit className="h-4 w-4 text-[#08387F]" />
+                                  </Button>
+                                  <Button type="button" variant="ghost" size="icon-sm" title="Xóa video" onClick={() => handleDeleteVideo(v)}>
+                                    <Trash2 className="h-4 w-4 text-rose-500" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Dialog sửa quyền ── */}
       <Dialog open={roleOpen} onOpenChange={(open) => { setRoleOpen(open); if (!open) setRoleRecord(null) }}>
         <DialogContent className="sm:max-w-sm">
@@ -700,6 +958,131 @@ export default function CourseDetail() {
         onDownloadErrors={downloadErrors}
         submitting={importSubmitting}
       />
+
+      {/* ── Dialog Chuyên đề/ Chương (tạo/sửa) ── */}
+      <Dialog open={sectionDialogOpen} onOpenChange={setSectionDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#08387F]">
+              <FolderPlus className="h-4 w-4" /> {sectionEditing ? 'Sửa Chuyên đề/ Chương' : 'Thêm Chuyên đề/ Chương'}
+            </DialogTitle>
+            <DialogDescription>Chuyên đề/ Chương thuộc môn <strong>{courseCode}</strong>.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">Tên Chuyên đề/ Chương <span className="text-rose-500">*</span></label>
+              <Input value={sectionForm.title}
+                onChange={(e) => setSectionForm((p) => ({ ...p, title: e.target.value }))}
+                placeholder="VD: Chuyên đề/ Chương 1 — Giới thiệu"
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmitSection()} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">Mô tả</label>
+              <textarea value={sectionForm.description}
+                onChange={(e) => setSectionForm((p) => ({ ...p, description: e.target.value }))}
+                rows={3} placeholder="Mô tả ngắn (không bắt buộc)"
+                className="w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#08387F]/30" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setSectionDialogOpen(false)}>Hủy</Button>
+            <Button type="button" className="bg-[#08387F] text-white hover:bg-[#072f6a]"
+              onClick={handleSubmitSection} disabled={sectionSubmitting}>
+              {sectionSubmitting ? 'Đang lưu...' : (sectionEditing ? 'Lưu Chuyên đề/ Chương' : 'Tạo Chuyên đề/ Chương')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog thêm video bài giảng ── */}
+      <Dialog open={videoDialogOpen} onOpenChange={setVideoDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#08387F]">
+              <Video className="h-4 w-4" /> Thêm video bài giảng
+            </DialogTitle>
+            <DialogDescription>File gốc sẽ được lưu trữ và đăng ký ở trạng thái <strong>Đã đăng ký</strong>.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">Chuyên đề/ Chương <span className="text-rose-500">*</span></label>
+              <select value={videoForm.sectionId}
+                onChange={(e) => setVideoForm((p) => ({ ...p, sectionId: e.target.value }))}
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#08387F]/30">
+                {sections.map((s) => <option key={s.id} value={s.id}>{s.order}. {s.title}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">Tiêu đề video <span className="text-rose-500">*</span></label>
+              <Input value={videoForm.title}
+                onChange={(e) => setVideoForm((p) => ({ ...p, title: e.target.value }))}
+                placeholder="VD: Bài 1 — Tổng quan" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">Mô tả</label>
+              <textarea value={videoForm.description}
+                onChange={(e) => setVideoForm((p) => ({ ...p, description: e.target.value }))}
+                rows={2} placeholder="Mô tả ngắn (không bắt buộc)"
+                className="w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#08387F]/30" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">File video <span className="text-rose-500">*</span></label>
+              <Input type="file" accept="video/mp4,video/webm,video/x-matroska,video/quicktime"
+                onChange={(e) => setVideoFile(e.target.files?.[0] || null)} />
+              {videoFile && (
+                <p className="text-xs text-slate-500">Đã chọn: <span className="font-medium text-slate-700">{videoFile.name}</span> ({(videoFile.size / 1024 / 1024).toFixed(1)} MB)</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setVideoDialogOpen(false)}>Hủy</Button>
+            <Button type="button" className="bg-[#08387F] text-white hover:bg-[#072f6a]"
+              onClick={handleSubmitVideo} disabled={videoSubmitting}>
+              {videoSubmitting ? 'Đang tải lên...' : 'Đăng ký video'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal xem video (HLS) ── */}
+      <Dialog open={viewOpen} onOpenChange={(open) => { setViewOpen(open); if (!open) setViewVideo(null) }}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#08387F]">
+              <Video className="h-4 w-4" /> {viewVideo?.title}
+            </DialogTitle>
+            <DialogDescription>
+              {viewVideo?.sectionTitle ? <>Chuyên đề/ Chương: <strong>{viewVideo.sectionTitle}</strong></> : 'Xem video bài giảng'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewVideo && (
+            <div className="space-y-3">
+              <HlsPlayer src={lectureVideoService.playlistUrl(viewVideo)} />
+
+              {viewVideo.description && (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{viewVideo.description}</p>
+              )}
+
+              <div className="flex flex-wrap gap-x-6 gap-y-1.5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                <div><span className="text-slate-400">Trạng thái: </span>
+                  <Badge className={`rounded-none ${VIDEO_STATUS_BADGE[viewVideo.status] || 'bg-slate-100 text-slate-700'}`}>
+                    {viewVideo.statusLabel || VIDEO_STATUS_LABEL[viewVideo.status] || viewVideo.status}
+                  </Badge>
+                </div>
+                <div><span className="text-slate-400">Phiên bản: </span><span className="font-medium text-slate-700">v{viewVideo.latestVersion}</span></div>
+                <div><span className="text-slate-400">Thời lượng: </span><span className="font-medium text-slate-700">{formatDuration(viewVideo.duration)}</span></div>
+                <div><span className="text-slate-400">Người đăng: </span><span className="font-medium text-slate-700">{viewVideo.uploaderName || '—'}</span></div>
+                <div><span className="text-slate-400">Ngày đăng: </span><span className="font-medium text-slate-700">{formatDate(viewVideo.uploadedAt)}</span></div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setViewOpen(false)}>Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
