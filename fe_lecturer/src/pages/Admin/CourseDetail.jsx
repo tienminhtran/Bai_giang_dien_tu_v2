@@ -39,6 +39,7 @@ const formatDate = (val) => {
 const TABS = [
   { key: 'info',      label: 'Mô tả môn học' },
   { key: 'lecturers', label: 'Danh sách giảng viên của môn' },
+  { key: 'video',  label: 'Video bài giảng' },
 ]
 
 // ── Import dialog (dành riêng cho 1 môn học — chỉ cần 2 cột) ──────────────

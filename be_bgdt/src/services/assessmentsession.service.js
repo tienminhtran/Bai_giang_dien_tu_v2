@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, literal } = require('sequelize');
 const {
   AssessmentSession,
   AcademicTerm,
@@ -102,7 +102,7 @@ const updateSession = async (id, payload = {}) => {
   const data = normalizePayload({ ...session.toJSON(), ...payload });
   await assertValid(data);
 
-  await session.update({ ...data, updated_at: new Date() });
+  await session.update({ ...data, updated_at: literal('SYSUTCDATETIME()') });
   return getSession(id);
 };
 

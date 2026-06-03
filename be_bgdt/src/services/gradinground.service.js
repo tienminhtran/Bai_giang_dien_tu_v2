@@ -1,4 +1,6 @@
-const { Op } = require('sequelize');
+const { Op, literal } = require('sequelize');
+// SQL Server tự sinh thời gian (tránh lỗi convert khi bind JS Date vào cột datetime)
+const NOW = () => literal('SYSUTCDATETIME()');
 const {
   GradingRound,
   AssessmentSession,
@@ -91,8 +93,8 @@ const createRound = async (payload = {}, createdByUserId) => {
   const created = await GradingRound.create({
     ...data,
     created_by: createdByUserId,
-    started_at: data.status === 'active' ? new Date() : null,
-    closed_at:  data.status === 'closed' ? new Date() : null,
+    started_at: data.status === 'active' ? NOW() : null,
+    closed_at:  data.status === 'closed' ? NOW() : null,
   });
 
   return getRound(created.id);
@@ -108,8 +110,8 @@ const updateRound = async (id, payload = {}) => {
 
   // Cập nhật mốc thời gian theo chuyển trạng thái
   const patch = { ...data };
-  if (data.status === 'active' && !round.started_at) patch.started_at = new Date();
-  if (data.status === 'closed' && !round.closed_at)  patch.closed_at  = new Date();
+  if (data.status === 'active' && !round.started_at) patch.started_at = NOW();
+  if (data.status === 'closed' && !round.closed_at)  patch.closed_at  = NOW();
 
   await round.update(patch);
   return getRound(id);

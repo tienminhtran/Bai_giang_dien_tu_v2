@@ -120,8 +120,8 @@ const MENU_CONFIG = {
       {
         items: [
           { label: 'Tổng quan',     icon: LayoutDashboard, path: '/dashboard/council' },
+          { label: 'Nhóm Kiểm định',     icon: ClipboardCheck,  path: '/dashboard/council/grading' },
           { label: 'Tiêu chí chấm', icon: ListChecks,      path: '/dashboard/council/criteria' },
-          { label: 'Kiểm định',     icon: ClipboardCheck,  path: '/dashboard/council/grading' },
         ],
       },
     ],

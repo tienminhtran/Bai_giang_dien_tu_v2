@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Building2, Eye, Plus, Trash2, UserPlus, X } from 'lucide-react'
+import { ArrowRight, BadgeAlert, Building2, Eye, LayoutGrid, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSearchParams } from 'react-router-dom'
 import assessmentSessionService from '@/services/assessmentSessionService'
 import gradingRoundService from '@/services/gradingRoundService'
 import gradingGroupService from '@/services/gradingGroupService'
+import gradingTeamService from '@/services/gradingTeamService'
 import userRoleService from '@/services/userRoleService'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,9 @@ const MEMBER_ROLES = [
 ]
 const ROLE_LABEL = { chair: 'Chủ tịch', secretary: 'Thư ký', member: 'Ủy viên' }
 const ROLE_BADGE = { chair: 'bg-violet-100 text-violet-700', secretary: 'bg-amber-100 text-amber-700', member: 'bg-sky-100 text-sky-700' }
+const ROLE_VALUES = MEMBER_ROLES.map((r) => r.value) // ['chair','secretary','member']
+// Mỗi hội đồng phải đủ 3 vai trò; Chủ tịch & Thư ký 1 người, Ủy viên không giới hạn
+const ROLE_CAP = { chair: 1, secretary: 1, member: Infinity }
 
 //  Modal tạo nhóm theo nhiều khoa 
 function CreateGroupDialog({ isOpen, onOpenChange, faculties, facultyHasGroup, form, onFormChange, selected, onToggle, onAdd, onRemove, onSubmit, submitting }) {
@@ -152,15 +156,29 @@ function GroupDetailDialog({ isOpen, onOpenChange, group, lecturers, onAddMember
 
   useEffect(() => { if (!isOpen) { setLecturerId(''); setMemberRole('member'); setPositionTitle('') } }, [isOpen])
 
+  // Hội đồng cần đủ 3 vai trò; Chủ tịch & Thư ký mỗi nhóm 1 người, Ủy viên không giới hạn
+  const takenRoles = new Set((group?.members || []).map((m) => m.memberRole))
+  const openRoles = MEMBER_ROLES.filter((r) => r.value === 'member' || !takenRoles.has(r.value))
+  const missingRoles = ROLE_VALUES.filter((v) => !takenRoles.has(v))
+
+  // Đảm bảo vai trò đang chọn luôn nằm trong các vai trò còn nhận thêm
+  useEffect(() => {
+    if (openRoles.length > 0 && !openRoles.some((r) => r.value === memberRole)) setMemberRole(openRoles[0].value)
+  }, [group?.id, group?.members?.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!group) return null
   const st = GROUP_STATUS[group.status] || { label: group.status, badge: 'bg-slate-100 text-slate-700' }
   const memberLecturerIds = new Set(group.members.map((m) => m.lecturerId))
   const availableLecturers = lecturers.filter((l) => !memberLecturerIds.has(l.id))
 
+  // Chỉ cho xóa khi vai trò đó vẫn còn người khác → luôn giữ đủ 3 vai trò (phải ≥ 4 thành viên mới xóa được)
+  const roleHolderCounts = group.members.reduce((acc, m) => { acc[m.memberRole] = (acc[m.memberRole] || 0) + 1; return acc }, {})
+  const canRemoveMember = (m) => (roleHolderCounts[m.memberRole] || 0) > 1
+
   const handleAdd = () => {
     if (!lecturerId) { toast.error('Vui lòng chọn giảng viên'); return }
     onAddMember({ lecturerId, memberRole, positionTitle })
-    setLecturerId(''); setPositionTitle(''); setMemberRole('member')
+    setLecturerId(''); setPositionTitle(''); setMemberRole(openRoles[0]?.value || 'member')
   }
 
   return (
@@ -175,20 +193,27 @@ function GroupDetailDialog({ isOpen, onOpenChange, group, lecturers, onAddMember
         </DialogHeader>
 
         {/* Thêm thành viên */}
-        <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1.6fr_1fr_1.2fr_auto]">
-          <select value={lecturerId} onChange={(e) => setLecturerId(e.target.value)} className={SELECT_CLS}>
-            <option value="">-- Chọn giảng viên --</option>
-            {availableLecturers.map((l) => (
-              <option key={l.id} value={l.id}>{l.lecturerCode} — {l.fullName}{l.facultyName ? ` (${l.facultyName})` : ''}</option>
-            ))}
-          </select>
-          <select value={memberRole} onChange={(e) => setMemberRole(e.target.value)} className={SELECT_CLS}>
-            {MEMBER_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
-          <Input value={positionTitle} onChange={(e) => setPositionTitle(e.target.value)} placeholder="Chức danh (tùy chọn)" />
-          <Button type="button" className="bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={handleAdd} disabled={busy}>
-            <UserPlus className="mr-2 h-4 w-4" /> Thêm
-          </Button>
+        <div className="space-y-2">
+          {missingRoles.length > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
+              Hội đồng còn thiếu vai trò: {missingRoles.map((v) => ROLE_LABEL[v]).join(', ')}
+            </div>
+          )}
+          <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1.6fr_1fr_1.2fr_auto]">
+            <select value={lecturerId} onChange={(e) => setLecturerId(e.target.value)} className={SELECT_CLS}>
+              <option value="">-- Chọn giảng viên --</option>
+              {availableLecturers.map((l) => (
+                <option key={l.id} value={l.id}>{l.lecturerCode} — {l.fullName}{l.facultyName ? ` (${l.facultyName})` : ''}</option>
+              ))}
+            </select>
+            <select value={memberRole} onChange={(e) => setMemberRole(e.target.value)} className={SELECT_CLS}>
+              {openRoles.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            <Input value={positionTitle} onChange={(e) => setPositionTitle(e.target.value)} placeholder="Chức danh (tùy chọn)" />
+            <Button type="button" className="bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={handleAdd} disabled={busy}>
+              <UserPlus className="mr-2 h-4 w-4" /> Thêm
+            </Button>
+          </div>
         </div>
 
         <div className="w-full overflow-x-auto rounded-none border border-slate-200">
@@ -214,8 +239,15 @@ function GroupDetailDialog({ isOpen, onOpenChange, group, lecturers, onAddMember
                   <TableCell><Badge className={`rounded-none ${ROLE_BADGE[m.memberRole] || 'bg-slate-100 text-slate-700'}`}>{ROLE_LABEL[m.memberRole] || m.memberRole}</Badge></TableCell>
                   <TableCell className="text-sm text-slate-600">{m.positionTitle || '—'}</TableCell>
                   <TableCell>
-                    <Button type="button" variant="ghost" size="icon-sm" title="Xóa thành viên" onClick={() => onRemoveMember(m.id)} disabled={busy}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      title={canRemoveMember(m) ? 'Xóa thành viên' : 'Mỗi vai trò phải còn ít nhất 1 người — cần ≥ 4 thành viên mới xóa được'}
+                      onClick={() => onRemoveMember(m.id)}
+                      disabled={busy || !canRemoveMember(m)}
+                    >
+                      <Trash2 className={`h-4 w-4 ${canRemoveMember(m) ? 'text-red-500' : 'text-slate-300'}`} />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -232,11 +264,11 @@ function GroupDetailDialog({ isOpen, onOpenChange, group, lecturers, onAddMember
   )
 }
 
-function AssignMembersModal({
+// ── Modal TẠO NHÓM CHẤM (bộ GV đủ 3 vai trò, chưa gắn hội đồng) ──────────────────
+function CreateTeamModal({
   isOpen,
   onOpenChange,
   round,
-  groups,
   faculties,
   lecturers,
   roleOptions,
@@ -245,28 +277,22 @@ function AssignMembersModal({
   onSubmit,
   submitting,
 }) {
-  const [selectedGroupIds, setSelectedGroupIds] = useState([])
+  const [teamName, setTeamName] = useState('')
   const [keyword, setKeyword] = useState('')
   const [facultyFilter, setFacultyFilter] = useState('')
   const [userRoleFilter, setUserRoleFilter] = useState('')
+  // selectedMembers: { [lecturerId]: { memberRole, positionTitle } }
   const [selectedMembers, setSelectedMembers] = useState({})
 
   useEffect(() => {
     if (!isOpen) {
-      setSelectedGroupIds([])
+      setTeamName('')
       setKeyword('')
       setFacultyFilter('')
       setUserRoleFilter('')
       setSelectedMembers({})
-      return
     }
-  }, [isOpen, groups])
-
-  useEffect(() => {
-    if (selectedGroupIds.length === 0) {
-      setSelectedMembers({})
-    }
-  }, [selectedGroupIds])
+  }, [isOpen])
 
   const facultyOptions = useMemo(() => {
     return faculties
@@ -277,6 +303,7 @@ function AssignMembersModal({
   const availableLecturers = useMemo(() => {
     const kw = keyword.trim().toLowerCase()
     return lecturers.filter((l) => {
+      // GV đã thuộc nhóm/hội đồng khác trong vòng thì không cho chọn
       if (occupiedLecturerIds.has(l.id) && !selectedMembers[l.id]) return false
       if (facultyFilter && l.facultyId !== facultyFilter) return false
       const roleNames = lecturerRoleMap[l.id] || []
@@ -291,96 +318,94 @@ function AssignMembersModal({
 
   const selectedCount = Object.keys(selectedMembers).length
 
-  const toggleGroup = (groupId) => {
-    setSelectedGroupIds((prev) => prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId])
+  const rolesTaken = useMemo(() => {
+    const taken = new Set()
+    Object.values(selectedMembers).forEach((info) => { if (info.memberRole) taken.add(info.memberRole) })
+    return taken
+  }, [selectedMembers])
+
+  const roleCountsExcept = (exceptLecturerId) => {
+    const counts = { chair: 0, secretary: 0, member: 0 }
+    Object.entries(selectedMembers).forEach(([lid, info]) => {
+      if (lid === exceptLecturerId || !info.memberRole) return
+      counts[info.memberRole] = (counts[info.memberRole] || 0) + 1
+    })
+    return counts
   }
 
   const toggleLecturer = (lecturer) => {
-    if (selectedGroupIds.length === 0) {
-      toast.error('Vui lòng chọn ít nhất 1 nhóm chấm trước')
-      return
-    }
     setSelectedMembers((prev) => {
       if (prev[lecturer.id]) {
         const next = { ...prev }
         delete next[lecturer.id]
         return next
       }
-      return {
-        ...prev,
-        [lecturer.id]: { memberRole: 'member', positionTitle: '' },
-      }
+      const counts = roleCountsExcept(lecturer.id)
+      const memberRole = ROLE_VALUES.find((v) => counts[v] === 0) || 'member'
+      return { ...prev, [lecturer.id]: { memberRole, positionTitle: '' } }
     })
   }
 
   const updateMemberField = (lecturerId, field, value) => {
     setSelectedMembers((prev) => ({
       ...prev,
-      [lecturerId]: {
-        ...(prev[lecturerId] || { memberRole: 'member', positionTitle: '' }),
-        [field]: value,
-      },
+      [lecturerId]: { ...(prev[lecturerId] || { memberRole: 'member', positionTitle: '' }), [field]: value },
     }))
   }
 
   const handleSave = () => {
-    if (selectedGroupIds.length === 0) { toast.error('Vui lòng chọn ít nhất 1 nhóm chấm'); return }
+    if (!teamName.trim()) { toast.error('Vui lòng nhập tên nhóm chấm'); return }
     if (selectedCount === 0) { toast.error('Vui lòng chọn ít nhất 1 giảng viên'); return }
 
-    const members = selectedGroupIds.flatMap((groupId) =>
-      Object.entries(selectedMembers).map(([lecturerId, info]) => ({
-        groupId,
-        lecturerId,
-        memberRole: info.memberRole || 'member',
-        positionTitle: info.positionTitle || '',
-      })),
-    )
+    const counts = roleCountsExcept(null)
+    if (counts.chair !== 1)     { toast.error('Nhóm phải có đúng 1 Chủ tịch'); return }
+    if (counts.secretary !== 1) { toast.error('Nhóm phải có đúng 1 Thư ký'); return }
+    if (counts.member < 1)      { toast.error('Nhóm phải có ít nhất 1 Ủy viên'); return }
 
-    onSubmit({ members })
+    const members = Object.entries(selectedMembers).map(([lecturerId, info]) => ({
+      lecturerId,
+      memberRole: info.memberRole || 'member',
+      positionTitle: info.positionTitle || '',
+    }))
+
+    onSubmit({ teamName: teamName.trim(), members })
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-6xl">
         <DialogHeader>
-          <DialogTitle>Phân công chấm {round?.roundName || '—'}</DialogTitle>
-          <DialogDescription>Chọn nhóm chấm và thêm danh sách giảng viên với vai trò/chức danh tương ứng.</DialogDescription>
-          {/* đợt chấm  và vòng chấm*/}
-          <DialogDescription className="mt-2 between:mx-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <span className="font-semibold text-slate-800">Đợt kiểm định:</span> {round?.sessionName || '—'}
-            <span className="mx-2"> </span>
-            <span className="font-semibold text-slate-800">Vòng chấm:</span> {round?.roundName || '—'}
+          <DialogTitle>Tạo nhóm chấm — {round?.roundName || '—'}</DialogTitle>
+          <DialogDescription>
+            Tạo sẵn một bộ giảng viên đủ 3 vai trò (1 Chủ tịch, 1 Thư ký, ít nhất 1 Ủy viên). Nhóm chưa gắn hội đồng — sẽ phân công bằng kéo-thả sau.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-5 py-2 md:grid-cols-2">
           <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Nhóm chấm</label>
-              <div className="max-h-[220px] space-y-1 overflow-auto rounded-xl border border-slate-200 bg-white p-2">
-                {groups.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-slate-400">Chưa có nhóm chấm.</p>
-                ) : groups.map((g) => {
-                  const checked = selectedGroupIds.includes(g.id)
-                  return (
-                    <label key={g.id} className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${checked ? 'bg-[#08387F]/10 text-[#08387F]' : 'text-slate-700 hover:bg-slate-50'}`}>
-                      <input type="checkbox" checked={checked} onChange={() => toggleGroup(g.id)} className="h-4 w-4 accent-[#08387F]" />
-                      <span className="truncate">{g.groupName} {g.facultyName ? `(${g.facultyName})` : ''}</span>
-                    </label>
-                  )
-                })}
-              </div>
+              <label className="text-sm font-semibold">Tên nhóm chấm</label>
+              <Input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="VD: Nhóm chấm số 1" />
             </div>
 
             <div className="space-y-1 text-sm text-slate-600">
               <p><span className="font-semibold text-slate-800">Vòng chấm:</span> {round?.roundName || '—'}</p>
-              <p><span className="font-semibold text-slate-800">Số nhóm hiện có:</span> {groups.length}</p>
-              <p><span className="font-semibold text-slate-800">Nhóm đã chọn:</span> {selectedGroupIds.length}</p>
-              <p><span className="font-semibold text-slate-800">Giảng viên đã chọn:</span> {selectedCount}</p>
+              <p><span className="font-semibold text-slate-800">Giảng viên đã chọn:</span> {selectedCount} <span className="text-slate-400">(tối thiểu 3)</span></p>
+            </div>
+
+            <div className="space-y-1.5 rounded-md border border-slate-200 bg-white p-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Vai trò trong nhóm</p>
+              <div className="flex flex-wrap gap-1.5">
+                {MEMBER_ROLES.map((r) => (
+                  <Badge key={r.value} className={`rounded-none ${rolesTaken.has(r.value) ? ROLE_BADGE[r.value] : 'bg-slate-100 text-slate-400'}`}>
+                    {rolesTaken.has(r.value) ? '✓ ' : '○ '}{r.label}
+                  </Badge>
+                ))}
+              </div>
             </div>
 
             <div className="rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-500">
-              Mỗi giảng viên được chọn cần có vai trò thành viên. Bạn có thể nhập chức danh riêng cho từng người ở cột phải.
+              Cần đủ 3 vai trò: 1 Chủ tịch, 1 Thư ký và ít nhất 1 Ủy viên (có thể thêm nhiều Ủy viên).
             </div>
           </div>
 
@@ -401,10 +426,12 @@ function AssignMembersModal({
               {availableLecturers.length === 0 ? (
                 <p className="py-6 text-center text-sm text-slate-400">Không có giảng viên phù hợp.</p>
               ) : availableLecturers.map((l) => {
-                const checked = Boolean(selectedMembers[l.id])
-                const role = selectedMembers[l.id]?.memberRole || 'member'
-                const title = selectedMembers[l.id]?.positionTitle || ''
+                const info = selectedMembers[l.id]
+                const checked = Boolean(info)
+                const role = info?.memberRole || 'member'
+                const title = info?.positionTitle || ''
                 const roleNames = lecturerRoleMap[l.id] || []
+                const counts = checked ? roleCountsExcept(l.id) : { chair: 0, secretary: 0, member: 0 }
                 return (
                   <div key={l.id} className={`rounded-lg border p-2 ${checked ? 'border-[#08387F]/40 bg-[#08387F]/5' : 'border-slate-200 bg-white'}`}>
                     <label className="flex items-center gap-2 text-sm">
@@ -420,7 +447,14 @@ function AssignMembersModal({
                     {checked && (
                       <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1.2fr]">
                         <select value={role} onChange={(e) => updateMemberField(l.id, 'memberRole', e.target.value)} className={SELECT_CLS}>
-                          {MEMBER_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                          {MEMBER_ROLES.map((r) => {
+                            const full = counts[r.value] >= ROLE_CAP[r.value]
+                            return (
+                              <option key={r.value} value={r.value} disabled={full}>
+                                {r.label}{full ? ' (đã có)' : ''}
+                              </option>
+                            )
+                          })}
                         </select>
                         <Input value={title} onChange={(e) => updateMemberField(l.id, 'positionTitle', e.target.value)} placeholder="position_title (tùy chọn)" />
                       </div>
@@ -435,8 +469,142 @@ function AssignMembersModal({
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Hủy</Button>
           <Button type="button" className="bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={handleSave} disabled={submitting}>
-            {submitting ? 'Đang lưu...' : `Lưu phân công (${selectedCount})`}
+            {submitting ? 'Đang lưu...' : `Tạo nhóm (${selectedCount} GV)`}
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Modal PHÂN CÔNG (kéo nhóm chấm thả vào hội đồng) ─────────────────────────────
+function AssignBoardModal({ isOpen, onOpenChange, round, groups, teams, onAssign, onDeleteTeam, busy }) {
+  const [selectedGroupIds, setSelectedGroupIds] = useState([])
+  const [dragGroupIds, setDragGroupIds] = useState([])
+  const [overTeamId, setOverTeamId] = useState(null)
+
+  // Hội đồng cần chấm = chưa có thành viên
+  const emptyGroups = useMemo(() => groups.filter((g) => (g.members?.length || 0) === 0), [groups])
+
+  // Bỏ chọn các hội đồng đã rời danh sách (sau khi gán) + reset khi đóng
+  useEffect(() => {
+    if (!isOpen) { setSelectedGroupIds([]); setDragGroupIds([]); setOverTeamId(null); return }
+    const ids = new Set(emptyGroups.map((g) => g.id))
+    setSelectedGroupIds((prev) => prev.filter((id) => ids.has(id)))
+  }, [isOpen, emptyGroups])
+
+  const toggleGroup = (id) => setSelectedGroupIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+
+  const handleDragStart = (group) => {
+    // Kéo 1 hội đồng đã chọn → kéo cả nhóm đã chọn; ngược lại chỉ kéo hội đồng đó
+    setDragGroupIds(selectedGroupIds.includes(group.id) ? selectedGroupIds : [group.id])
+  }
+
+  const dropOnTeam = (teamId) => {
+    setOverTeamId(null)
+    const ids = dragGroupIds
+    setDragGroupIds([])
+    if (teamId && ids.length) onAssign(teamId, ids)
+  }
+
+  const assignSelected = (teamId) => {
+    if (selectedGroupIds.length === 0) { toast.error('Hãy chọn ít nhất 1 hội đồng cần chấm'); return }
+    onAssign(teamId, selectedGroupIds)
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>Phân công chấm — {round?.roundName || '—'}</DialogTitle>
+          <DialogDescription>
+            Tick chọn 1 hoặc nhiều hội đồng cần chấm (bên trái) rồi kéo thả vào 1 nhóm chấm (bên phải) — hoặc bấm “Gán”. Một nhóm có thể chấm nhiều hội đồng.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-5 py-2 md:grid-cols-2">
+          {/* Cột trái — hội đồng cần chấm (draggable, multi-select) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold">Hội đồng cần chấm ({emptyGroups.length})</label>
+              {emptyGroups.length > 0 && (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-[#08387F] hover:underline"
+                  onClick={() => setSelectedGroupIds(selectedGroupIds.length === emptyGroups.length ? [] : emptyGroups.map((g) => g.id))}
+                >
+                  {selectedGroupIds.length === emptyGroups.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                </button>
+              )}
+            </div>
+            <div className="max-h-[420px] space-y-2 overflow-auto rounded-xl border border-slate-200 p-2">
+              {emptyGroups.length === 0 ? (
+                <p className="py-6 text-center text-sm text-slate-400">
+                  {groups.length === 0 ? 'Chưa có hội đồng nào.' : 'Tất cả hội đồng đã được phân công.'}
+                </p>
+              ) : emptyGroups.map((g) => {
+                const checked = selectedGroupIds.includes(g.id)
+                return (
+                  <div
+                    key={g.id}
+                    draggable={!busy}
+                    onDragStart={() => handleDragStart(g)}
+                    onDragEnd={() => setDragGroupIds([])}
+                    className={`flex cursor-grab items-center gap-2 rounded-lg border px-3 py-2 ${checked ? 'border-[#08387F]/50 bg-[#08387F]/5' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                  >
+                    <input type="checkbox" checked={checked} onChange={() => toggleGroup(g.id)} className="h-4 w-4 accent-[#08387F]" />
+                    <Building2 className="h-4 w-4 shrink-0 text-slate-400" />
+                    <span className="flex-1 truncate text-sm font-medium text-slate-900">{g.groupName}</span>
+                    {g.facultyName && <span className="shrink-0 text-xs text-slate-500">{g.facultyName}</span>}
+                  </div>
+                )
+              })}
+            </div>
+            <p className="text-xs text-slate-400">Đã chọn {selectedGroupIds.length} hội đồng.</p>
+          </div>
+
+          {/* Cột phải — nhóm chấm (drop target) */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold">Nhóm chấm ({teams.length})</label>
+            <div className="max-h-[420px] space-y-2 overflow-auto rounded-xl border border-slate-200 p-2">
+              {teams.length === 0 ? (
+                <p className="py-6 text-center text-sm text-slate-400">Chưa có nhóm chấm. Hãy bấm “Tạo nhóm chấm”.</p>
+              ) : teams.map((t) => (
+                <div
+                  key={t.id}
+                  onDragOver={(e) => { e.preventDefault(); setOverTeamId(t.id) }}
+                  onDragLeave={() => setOverTeamId((cur) => (cur === t.id ? null : cur))}
+                  onDrop={(e) => { e.preventDefault(); dropOnTeam(t.id) }}
+                  className={`rounded-lg border-2 border-dashed p-2 transition-colors ${overTeamId === t.id ? 'border-[#08387F] bg-[#08387F]/10' : 'border-slate-200 bg-white'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 truncate text-sm font-semibold text-slate-900">{t.teamName}</span>
+                    {t.assignedCount > 0 && (
+                      <Badge variant="secondary" className="rounded-none bg-emerald-50 text-emerald-700 hover:bg-emerald-50">đã chấm {t.assignedCount} HĐ</Badge>
+                    )}
+                    <Button type="button" size="sm" className="bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={() => assignSelected(t.id)} disabled={busy || selectedGroupIds.length === 0}>
+                      Gán {selectedGroupIds.length || ''}
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon-sm" title="Xóa nhóm" onClick={() => onDeleteTeam(t.id)} disabled={busy}>
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {t.members.map((m) => (
+                      <Badge key={m.id} className={`rounded-none ${ROLE_BADGE[m.memberRole] || 'bg-slate-100 text-slate-700'}`}>
+                        {ROLE_LABEL[m.memberRole] || m.memberRole}: {m.lecturerName || m.lecturerCode}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">Thả hội đồng vào đây để phân công cho nhóm này</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Đóng</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -450,11 +618,11 @@ export default function GradingGroupManagement() {
   const [sessions, setSessions] = useState([])
   const [rounds, setRounds] = useState([])
   const [selectedRoundId, setSelectedRoundId] = useState('')
-  const [setup, setSetup] = useState({ round: null, groups: [], faculties: [], lecturers: [] })
+  const [setup, setSetup] = useState({ round: null, groups: [], faculties: [], lecturers: [], teams: [] })
   const [loading, setLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // Create modal
+  // Create council (hội đồng theo khoa)
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState({ groupName: '', status: 'forming', note: '' })
   const [selectedFaculties, setSelectedFaculties] = useState([])
@@ -463,8 +631,12 @@ export default function GradingGroupManagement() {
   // Detail dialog
   const [detailGroupId, setDetailGroupId] = useState(null)
   const [memberBusy, setMemberBusy] = useState(false)
-  const [assignOpen, setAssignOpen] = useState(false)
-  const [assigning, setAssigning] = useState(false)
+
+  // Nhóm chấm (team) + phân công kéo-thả
+  const [createTeamOpen, setCreateTeamOpen] = useState(false)
+  const [creatingTeam, setCreatingTeam] = useState(false)
+  const [assignBoardOpen, setAssignBoardOpen] = useState(false)
+  const [teamBusy, setTeamBusy] = useState(false)
   const [roleOptions, setRoleOptions] = useState([])
   const [lecturerRoleMap, setLecturerRoleMap] = useState({})
 
@@ -482,7 +654,7 @@ export default function GradingGroupManagement() {
   }, [])
 
   useEffect(() => {
-    if (!assignOpen) return
+    if (!createTeamOpen) return
     const loadLecturerRoles = async () => {
       try {
         const { total } = await userRoleService.listLecturerRoles({ page: 1, pageSize: 1 })
@@ -498,14 +670,14 @@ export default function GradingGroupManagement() {
       }
     }
     loadLecturerRoles()
-  }, [assignOpen])
+  }, [createTeamOpen])
 
   // Tải danh sách vòng chấm theo đợt kiểm định đang chọn
   useEffect(() => {
     if (!sessionId) {
       setRounds([])
       setSelectedRoundId('')
-      setSetup({ round: null, groups: [], faculties: [], lecturers: [] })
+      setSetup({ round: null, groups: [], faculties: [], lecturers: [], teams: [] })
       return
     }
     gradingRoundService.list({ sessionId, pageSize: 200 })
@@ -522,7 +694,7 @@ export default function GradingGroupManagement() {
 
   // Tải setup theo vòng chấm
   useEffect(() => {
-    if (!selectedRoundId) { setSetup({ round: null, groups: [], faculties: [], lecturers: [] }); return }
+    if (!selectedRoundId) { setSetup({ round: null, groups: [], faculties: [], lecturers: [], teams: [] }); return }
     setLoading(true)
     gradingGroupService.getRoundSetup(selectedRoundId)
       .then(setSetup)
@@ -534,7 +706,11 @@ export default function GradingGroupManagement() {
 
   const facultyHasGroup = useMemo(() => new Set(setup.groups.map((g) => g.facultyId)), [setup.groups])
   const detailGroup = useMemo(() => setup.groups.find((g) => g.id === detailGroupId) || null, [setup.groups, detailGroupId])
-  const occupiedLecturerIds = useMemo(() => new Set(setup.groups.flatMap((g) => g.members.map((m) => m.lecturerId))), [setup.groups])
+  // GV đã thuộc 1 hội đồng (đã gán) hoặc 1 nhóm chấm chưa gán trong vòng này
+  const occupiedLecturerIds = useMemo(() => new Set([
+    ...setup.groups.flatMap((g) => g.members.map((m) => m.lecturerId)),
+    ...(setup.teams || []).flatMap((t) => t.members.map((m) => m.lecturerId)),
+  ]), [setup.groups, setup.teams])
 
   // Create modal handlers
   const openCreate = () => { setCreateForm({ groupName: '', status: 'forming', note: '' }); setSelectedFaculties([]); setCreateOpen(true) }
@@ -599,40 +775,51 @@ export default function GradingGroupManagement() {
     }
   }
 
-  const handleAssignMembers = async ({ members }) => {
+  // Tạo nhóm chấm (bộ GV chưa gắn hội đồng)
+  const handleCreateTeam = async ({ teamName, members }) => {
+    if (!selectedRoundId) { toast.error('Chưa chọn vòng chấm'); return }
     try {
-      setAssigning(true)
-      let successCount = 0
-      let failCount = 0
-      let lastSuccessGroupId = ''
-      for (const member of members) {
-        try {
-          const { groupId, ...payload } = member
-          if (!groupId) {
-            failCount += 1
-            toast.error('Thiếu nhóm chấm cho một giảng viên được chọn')
-            continue
-          }
-          await gradingGroupService.addMember(groupId, payload)
-          successCount += 1
-          lastSuccessGroupId = groupId
-        } catch (err) {
-          failCount += 1
-          const msg = err?.response?.data?.message || `Không thêm được giảng viên ${member.lecturerId}`
-          toast.error(msg)
-        }
-      }
-
-      if (successCount > 0) {
-        toast.success(`Đã phân công ${successCount} giảng viên${failCount ? `, lỗi ${failCount}` : ''}`)
-        setAssignOpen(false)
-        if (lastSuccessGroupId) setDetailGroupId(lastSuccessGroupId)
-        reload()
-      } else {
-        toast.error('Không thể lưu phân công')
-      }
+      setCreatingTeam(true)
+      const res = await gradingTeamService.createTeam({ roundId: selectedRoundId, teamName, members })
+      toast.success(res.message || 'Tạo nhóm chấm thành công')
+      setCreateTeamOpen(false)
+      reload()
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Tạo nhóm chấm thất bại')
     } finally {
-      setAssigning(false)
+      setCreatingTeam(false)
+    }
+  }
+
+  // Gán 1 nhóm chấm cho 1 hoặc nhiều hội đồng
+  const handleAssignTeam = async (teamId, groupIds) => {
+    const ids = Array.isArray(groupIds) ? groupIds : [groupIds]
+    if (ids.length === 0) return
+    try {
+      setTeamBusy(true)
+      let ok = 0, fail = 0
+      for (const gid of ids) {
+        try { await gradingTeamService.assignTeam(teamId, gid); ok += 1 }
+        catch (err) { fail += 1; toast.error(err?.response?.data?.message || 'Phân công thất bại') }
+      }
+      if (ok > 0) toast.success(`Đã phân công ${ok} hội đồng${fail ? `, lỗi ${fail}` : ''}`)
+      reload()
+    } finally {
+      setTeamBusy(false)
+    }
+  }
+
+  const handleDeleteTeam = async (teamId) => {
+    if (!window.confirm('Xóa nhóm chấm này?')) return
+    try {
+      setTeamBusy(true)
+      await gradingTeamService.delete(teamId)
+      toast.success('Đã xóa nhóm chấm')
+      reload()
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Xóa nhóm chấm thất bại')
+    } finally {
+      setTeamBusy(false)
     }
   }
 
@@ -693,11 +880,11 @@ export default function GradingGroupManagement() {
                   ))}
                 </select>
               </div>
-              <div className="flex items-end">
+              {/* <div className="flex items-end">
                 <Button type="button" className="w-full bg-[#08387F] text-white hover:bg-[#072f6a]" onClick={openCreate} disabled={!selectedRoundId}>
                   <Plus className="mr-2 h-4 w-4" /> Tạo nhóm
                 </Button>
-              </div>
+              </div> */}
             </div>
           </div>
 
@@ -745,19 +932,33 @@ export default function GradingGroupManagement() {
                 {setup.round?.facultyScopeName && (
                   <Badge variant="secondary" className="rounded-none bg-blue-50 text-blue-700 hover:bg-blue-50">Phạm vi: {setup.round.facultyScopeName}</Badge>
                 )}
-                <Button type="button" variant="outline" className="ml-auto text-green-500 hover:text-green-600 bg-green-100 hover:bg-green-200" onClick={openCreate} disabled={!selectedRoundId}>
-                  <Plus className="mr-2 h-4 w-4" /> Nhóm chấm {selectedRound?.roundName || '—'}    
+                {setup.teams?.length > 0 && (
+                  <Badge variant="secondary" className="rounded-none bg-violet-50 text-violet-700 hover:bg-violet-50">Nhóm chấm: {setup.teams.length}</Badge>
+                )}
+                <Button type="button" variant="outline" title="Chức năng này tạo hội đồng trên các Khoa/Viện để chấm bài giảng"className="ml-auto text-green-500 hover:text-green-600 bg-green-100 hover:bg-green-200" onClick={openCreate} disabled={!selectedRoundId}>
+                  <Plus className="mr-2 h-4 w-4" /> Thành lập hội dồng
                 </Button>
 
-                {/* Tạo nhóm Thành viên chấm cho vòng Này */}
+                {/* Tạo nhóm chấm (bộ GV chưa gắn hội đồng) */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-violet-500 hover:text-violet-600 bg-violet-100 hover:bg-violet-200"
+                  onClick={() => setCreateTeamOpen(true)}
+                  disabled={!selectedRoundId}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" /> Tạo nhóm Kiểm định viên
+                </Button>
+
+                {/* Phân công bằng kéo-thả */}
                 <Button
                   type="button"
                   variant="outline"
                   className="text-blue-500 hover:text-blue-600 bg-blue-100 hover:bg-blue-200"
-                  onClick={() => setAssignOpen(true)}
+                  onClick={() => setAssignBoardOpen(true)}
                   disabled={!selectedRoundId}
                 >
-                  <UserPlus className="mr-2 h-4 w-4" /> Phân công Chấm {selectedRound ? selectedRound.roundName : '—'}
+                  <ArrowRight className="mr-2 h-4 w-4" /> Phân công Kiêm định viên vào hội đồng
                 </Button>
 
               </div>
@@ -770,6 +971,7 @@ export default function GradingGroupManagement() {
                       <TableHead className="w-[220px]">Vòng chấm</TableHead>
                       <TableHead className="w-[220px]">Khoa kiểm định</TableHead>
                       <TableHead className="w-[110px]">Số Thành viên</TableHead>
+                      <TableHead className="w-[140px]">Thành viên chấm</TableHead>
                       <TableHead className="w-[140px]">Trạng thái</TableHead>
                       <TableHead className="w-[110px]">Hành động</TableHead>
                     </TableRow>
@@ -787,10 +989,27 @@ export default function GradingGroupManagement() {
                           <TableCell className="text-slate-600">{g.roundName || '—'}</TableCell>
                           <TableCell className="text-slate-600">{g.facultyName || '—'}</TableCell>
                           <TableCell className="font-mono text-slate-700">{g.members.length}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {/* Vai trò và tên giảng viên */}
+                              {g.members.map((m) => (
+                                <Badge key={m.id} className={`rounded-none ${ROLE_BADGE[m.memberRole] || 'bg-slate-100 text-slate-700'}`}>
+                                  {ROLE_LABEL[m.memberRole] || m.memberRole}: {m.lecturerName || m.lecturerCode}
+                                </Badge>
+                              ))}
+                
+                            </div>
+                          </TableCell>
                           <TableCell><Badge className={`rounded-none ${st.badge}`}>{st.label}</Badge></TableCell>
                           <TableCell>
-                            <Button type="button" variant="ghost" size="icon-sm" title="Xem chi tiết" onClick={() => setDetailGroupId(g.id)}>
-                              <Eye className="h-4 w-4 text-blue-500" />
+                            {/* Xem chi tiết */}
+                            <Button type="button" variant="outline" size="sm" onClick={() => setDetailGroupId(g.id)}>
+                              <LayoutGrid className="mr-1 h-4 w-4" />
+                              Xem chi tiết
+                            </Button>
+
+                            <Button type="button" variant="ghost" size="icon-sm" title="Chức năng phân công riêng lẻ" onClick={() => setDetailGroupId(g.id)}>
+                              <BadgeAlert className="h-4 w-4 text-blue-500" />
                             </Button>
                             <Button type="button" variant="ghost" size="icon-sm" title="Xóa nhóm" onClick={() => handleDeleteGroup(g)}>
                               <Trash2 className="h-4 w-4 text-red-500" />
@@ -830,18 +1049,28 @@ export default function GradingGroupManagement() {
             busy={memberBusy}
           />
 
-          <AssignMembersModal
-            isOpen={assignOpen}
-            onOpenChange={setAssignOpen}
+          <CreateTeamModal
+            isOpen={createTeamOpen}
+            onOpenChange={setCreateTeamOpen}
             round={selectedRound}
-            groups={setup.groups}
             faculties={setup.faculties}
             lecturers={setup.lecturers}
             roleOptions={roleOptions}
             lecturerRoleMap={lecturerRoleMap}
             occupiedLecturerIds={occupiedLecturerIds}
-            onSubmit={handleAssignMembers}
-            submitting={assigning}
+            onSubmit={handleCreateTeam}
+            submitting={creatingTeam}
+          />
+
+          <AssignBoardModal
+            isOpen={assignBoardOpen}
+            onOpenChange={setAssignBoardOpen}
+            round={selectedRound}
+            groups={setup.groups}
+            teams={setup.teams || []}
+            onAssign={handleAssignTeam}
+            onDeleteTeam={handleDeleteTeam}
+            busy={teamBusy}
           />
         </>
       )}

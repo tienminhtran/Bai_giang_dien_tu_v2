@@ -109,7 +109,7 @@ const updateTemplate = async (id, payload = {}) => {
       `total_max_score (${data.total_max_score}) nhỏ hơn tổng điểm tiêu chí hiện có (${currentSum})`,
     );
 
-  await template.update({ ...data, updated_at: new Date() });
+  await template.update({ ...data, updated_at: sequelize.literal('SYSUTCDATETIME()') });
   return getTemplate(id);
 };
 

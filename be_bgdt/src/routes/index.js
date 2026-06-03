@@ -24,6 +24,7 @@ router.use('/department-head',   require('./departmentHead.routes'));
 router.use('/assessment-sessions', require('./assessmentsession.routes'));
 router.use('/grading-rounds',    require('./gradinground.routes'));
 router.use('/grading-groups',    require('./gradinggroup.routes'));
+router.use('/grading-teams',     require('./gradingteam.routes'));
 router.use('/grading-criteria-templates', require('./gradingtemplate.routes'));
 
 module.exports = router;

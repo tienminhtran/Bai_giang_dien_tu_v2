@@ -9,7 +9,11 @@ module.exports = (sequelize) => {
     },
     group_id: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true, // null = member của nhóm (team) chưa được gán vào hội đồng
+    },
+    team_id: {
+      type: DataTypes.UUID,
+      allowNull: true, // gom member vào 1 nhóm chấm trước khi gán hội đồng
     },
     lecturer_id: {
       type: DataTypes.UUID,

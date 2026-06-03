@@ -31,9 +31,6 @@ router.delete('/:id', authenticate, authorize('admin'), ctrl.remove);
 // Body: { lecturer_id, member_role?, position_title?, is_active? }
 router.post('/:id/members', authenticate, authorize('admin'), ctrl.addMember);
 
-// PUT /api/grading-groups/:id/members/:memberId
-router.put('/:id/members/:memberId', authenticate, authorize('admin'), ctrl.updateMember);
-
 // DELETE /api/grading-groups/:id/members/:memberId
 router.delete('/:id/members/:memberId', authenticate, authorize('admin'), ctrl.removeMember);
 

@@ -10,6 +10,7 @@ const ApiError = require('../utils/ApiError');
 
 const VALID_GROUP_STATUSES = ['forming', 'active', 'closed'];
 const VALID_MEMBER_ROLES   = ['chair', 'member', 'secretary'];
+const MEMBER_ROLE_LABEL    = { chair: 'Chủ tịch', secretary: 'Thư ký', member: 'Ủy viên' };
 
 const MEMBER_INCLUDE = [
   { model: Lecturer, as: 'lecturer', attributes: ['id', 'lecturer_code', 'full_name', 'email'], required: false },
@@ -127,7 +128,9 @@ const getRoundSetup = async (roundId) => {
   const lecturerWhere = { is_active: true };
   if (round.faculty_scope_id) lecturerWhere.faculty_id = round.faculty_scope_id;
 
-  const [faculties, lecturers] = await Promise.all([
+  const teamService = require('./gradingteam.service');
+
+  const [faculties, lecturers, teams] = await Promise.all([
     Faculty.findAll({ where: facultyWhere, attributes: ['id', 'faculty_name'], order: [['faculty_name', 'ASC']] }),
     Lecturer.findAll({
       where: lecturerWhere,
@@ -135,9 +138,11 @@ const getRoundSetup = async (roundId) => {
       include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'faculty_name'], required: false }],
       order: [['full_name', 'ASC']],
     }),
+    // Nhóm chấm của vòng (khuôn GV, dùng lại cho nhiều hội đồng qua kéo-thả)
+    teamService.listTeams({ round_id: roundId }),
   ]);
 
-  return { round, groups, faculties, lecturers };
+  return { round, groups, faculties, lecturers, teams };
 };
 
 // ── Tạo nhóm hàng loạt theo nhiều khoa ───────────────────────────────────────
@@ -209,12 +214,14 @@ const assertValidMember = async (groupId, data, { excludeMemberId = null } = {})
   const dup = await GradingGroupMember.count({ where: dupWhere });
   if (dup > 0) throw ApiError.conflict('Giảng viên đã có trong nhóm này');
 
-  // Mỗi nhóm chỉ có 1 chủ tịch (chair)
-  if (data.member_role === 'chair') {
-    const chairWhere = { group_id: groupId, member_role: 'chair' };
-    if (excludeMemberId) chairWhere.id = { [Op.ne]: excludeMemberId };
-    const chairCount = await GradingGroupMember.count({ where: chairWhere });
-    if (chairCount > 0) throw ApiError.conflict('Nhóm đã có chủ tịch (chair)');
+  // Hội đồng phải có đủ 3 vai trò; Chủ tịch & Thư ký mỗi nhóm 1 người, Ủy viên có thể nhiều người
+  const SINGLE_ROLES = ['chair', 'secretary'];
+  if (SINGLE_ROLES.includes(data.member_role)) {
+    const roleWhere = { group_id: groupId, member_role: data.member_role };
+    if (excludeMemberId) roleWhere.id = { [Op.ne]: excludeMemberId };
+    const roleCount = await GradingGroupMember.count({ where: roleWhere });
+    if (roleCount > 0)
+      throw ApiError.conflict(`Nhóm đã có ${MEMBER_ROLE_LABEL[data.member_role] || data.member_role}`);
   }
 };
 
@@ -241,20 +248,18 @@ const addMember = async (groupId, payload = {}, assignedByUserId) => {
   return getGroup(groupId);
 };
 
-const updateMember = async (groupId, memberId, payload = {}) => {
-  const member = await GradingGroupMember.findOne({ where: { id: memberId, group_id: groupId } });
-  if (!member) throw ApiError.notFound('Không tìm thấy thành viên trong nhóm');
-
-  const data = normalizeMember({ ...member.toJSON(), ...payload });
-  await assertValidMember(groupId, data, { excludeMemberId: memberId });
-
-  await member.update(data);
-  return getGroup(groupId);
-};
-
 const removeMember = async (groupId, memberId) => {
   const member = await GradingGroupMember.findOne({ where: { id: memberId, group_id: groupId } });
   if (!member) throw ApiError.notFound('Không tìm thấy thành viên trong nhóm');
+
+  // Hội đồng phải luôn đủ 3 vai trò → không cho xóa nếu là người duy nhất của vai trò đó
+  const sameRoleCount = await GradingGroupMember.count({
+    where: { group_id: groupId, member_role: member.member_role },
+  });
+  if (sameRoleCount <= 1)
+    throw ApiError.badRequest(
+      `Không thể xóa: hội đồng phải còn ít nhất 1 ${MEMBER_ROLE_LABEL[member.member_role] || member.member_role}`,
+    );
 
   await member.destroy();
   return getGroup(groupId);
@@ -269,6 +274,5 @@ module.exports = {
   updateGroup,
   deleteGroup,
   addMember,
-  updateMember,
   removeMember,
 };

@@ -41,6 +41,15 @@ const toGroup = (g) => ({
 
 const toFaculty = (f) => ({ id: f.id, facultyName: f.faculty_name })
 
+const toTeam = (t) => ({
+  id:            t.id,
+  roundId:       t.round_id || '',
+  teamName:      t.team_name,
+  note:          t.note || '',
+  assignedCount: Number(t.assignedCount) || 0,
+  members:       Array.isArray(t.members) ? t.members.map(toMember) : [],
+})
+
 const toRound = (r) => ({
   id:               r.id,
   roundName:        r.round_name,
@@ -59,6 +68,7 @@ const getRoundSetup = async (roundId) => {
     groups:    (d.groups || []).map(toGroup),
     faculties: (d.faculties || []).map(toFaculty),
     lecturers: (d.lecturers || []).map(toLecturer),
+    teams:     (d.teams || []).map(toTeam),
   }
 }
 
@@ -116,15 +126,6 @@ const addMember = async (groupId, { lecturerId, memberRole = 'member', positionT
   return toGroup(res.data.data)
 }
 
-const updateMember = async (groupId, memberId, { memberRole, positionTitle, isActive }) => {
-  const res = await api.put(GRADING_GROUP_EP.MEMBER(groupId, memberId), {
-    member_role:    memberRole,
-    position_title: positionTitle?.trim() || undefined,
-    is_active:      isActive,
-  })
-  return toGroup(res.data.data)
-}
-
 const removeMember = async (groupId, memberId) => {
   const res = await api.delete(GRADING_GROUP_EP.MEMBER(groupId, memberId))
   return toGroup(res.data.data)
@@ -132,5 +133,5 @@ const removeMember = async (groupId, memberId) => {
 
 export default {
   getRoundSetup, list, getOne, bulkCreate, update, delete: remove,
-  addMember, updateMember, removeMember,
+  addMember, removeMember,
 }

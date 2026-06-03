@@ -24,6 +24,7 @@ const GradingCriteriaItem    = require('./GradingCriteriaItem')(sequelize);
 const AssessmentSession      = require('./AssessmentSession')(sequelize);
 const GradingRound           = require('./GradingRound')(sequelize);
 const GradingGroup           = require('./GradingGroup')(sequelize);
+const GradingTeam            = require('./GradingTeam')(sequelize);
 const GradingGroupMember     = require('./GradingGroupMember')(sequelize);
 const GradingRoundVideo      = require('./GradingRoundVideo')(sequelize);
 const VideoGradingScore      = require('./VideoGradingScore')(sequelize);
@@ -156,6 +157,16 @@ GradingGroup.belongsTo(Faculty, { foreignKey: 'faculty_id', as: 'faculty' });
 User.hasMany(GradingGroup, { foreignKey: 'created_by', as: 'createdGroups' });
 GradingGroup.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 
+// Nhóm chấm tạo sẵn (grading_teams) — bộ GV chưa gắn hội đồng, theo vòng
+GradingRound.hasMany(GradingTeam, { foreignKey: 'round_id', as: 'teams' });
+GradingTeam.belongsTo(GradingRound, { foreignKey: 'round_id', as: 'round' });
+
+User.hasMany(GradingTeam, { foreignKey: 'created_by', as: 'createdTeams' });
+GradingTeam.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+
+GradingTeam.hasMany(GradingGroupMember, { foreignKey: 'team_id', as: 'members' });
+GradingGroupMember.belongsTo(GradingTeam, { foreignKey: 'team_id', as: 'team' });
+
 // Thành viên nhóm chấm (grading_group_members)
 GradingGroup.hasMany(GradingGroupMember, { foreignKey: 'group_id', as: 'members' });
 GradingGroupMember.belongsTo(GradingGroup, { foreignKey: 'group_id', as: 'group' });
@@ -238,6 +249,7 @@ module.exports = {
   AssessmentSession,
   GradingRound,
   GradingGroup,
+  GradingTeam,
   GradingGroupMember,
   GradingRoundVideo,
   VideoGradingScore,

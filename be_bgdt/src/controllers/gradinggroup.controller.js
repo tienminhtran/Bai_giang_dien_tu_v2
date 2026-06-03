@@ -96,16 +96,6 @@ const addMember = async (req, res) => {
   }
 };
 
-// PUT /api/grading-groups/:id/members/:memberId
-const updateMember = async (req, res) => {
-  try {
-    const group = await groupService.updateMember(req.params.id, req.params.memberId, req.body || {});
-    return res.json({ success: true, message: 'Cập nhật thành viên thành công', data: group });
-  } catch (err) {
-    return handleError(res, err);
-  }
-};
-
 // DELETE /api/grading-groups/:id/members/:memberId
 const removeMember = async (req, res) => {
   try {
@@ -116,4 +106,4 @@ const removeMember = async (req, res) => {
   }
 };
 
-module.exports = { list, getOne, roundSetup, create, bulkCreate, update, remove, addMember, updateMember, removeMember };
+module.exports = { list, getOne, roundSetup, create, bulkCreate, update, remove, addMember, removeMember };
